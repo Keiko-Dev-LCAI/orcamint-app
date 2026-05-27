@@ -599,10 +599,10 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           </div>
 
           <div class="fee-preview" id="feePreview">
-            <div class="fee-row"><span class="lbl">Mint fee</span><span class="val" id="fpMintFee">1 LCAI</span></div>
+            <div class="fee-row"><span class="lbl">Mint fee</span><span class="val" id="fpMintFee">Free</span></div>
             <div class="fee-row"><span class="lbl">Your royalty on resales</span><span class="val" id="fpRoyalty">5%</span></div>
             <div class="fee-row"><span class="lbl">Platform commission</span><span class="val">2.5% (sales only)</span></div>
-            <div class="fee-row fee-total"><span class="lbl fw700">Total to pay now</span><span class="val text-cyan" id="fpTotal">1 LCAI</span></div>
+            <div class="fee-row fee-total"><span class="lbl fw700">Total to pay now</span><span class="val text-cyan" id="fpTotal">Free</span></div>
           </div>
 
           <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem;" onclick="mintNFT()">
@@ -653,8 +653,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           </div>
 
           <div class="fee-preview">
-            <div class="fee-row"><span class="lbl">Collection creation fee</span><span class="val">5 LCAI</span></div>
-            <div class="fee-row fee-total"><span class="lbl fw700">Total</span><span class="val text-cyan">5 LCAI</span></div>
+            <div class="fee-row"><span class="lbl">Collection creation fee</span><span class="val" id="colFeeDisplay">$1.00</span></div>
+            <div class="fee-row fee-total"><span class="lbl fw700">Total</span><span class="val text-cyan" id="colFeeTotal">$1.00</span></div>
           </div>
 
           <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem;" onclick="createCollection()">
@@ -730,8 +730,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           <div style="font-weight:700;margin-bottom:14px;">Platform Info</div>
           <div class="fee-row"><span class="lbl">Network</span><span class="val">Lightchain (chainId 9200)</span></div>
           <div class="fee-row"><span class="lbl">Native coin</span><span class="val">LCAI</span></div>
-          <div class="fee-row"><span class="lbl">Mint fee</span><span class="val" id="settingsMintFee">1 LCAI</span></div>
-          <div class="fee-row"><span class="lbl">Collection fee</span><span class="val">5 LCAI</span></div>
+          <div class="fee-row"><span class="lbl">Mint fee</span><span class="val" id="settingsMintFee">Free</span></div>
+          <div class="fee-row"><span class="lbl">Collection fee</span><span class="val" id="settingsColFee">$1.00</span></div>
           <div class="fee-row"><span class="lbl">Platform commission</span><span class="val">2.5%</span></div>
           <div class="fee-row"><span class="lbl">Contract</span><span class="val addr-short" id="settingsContract">Not deployed yet</span></div>
         </div>
@@ -850,6 +850,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 <!-- ── TOAST ZONE ── -->
 <div id="toastZone"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
 <script>
 // ── CONSTANTS ──
 const CHAIN_ID       = 9200;
@@ -891,7 +892,7 @@ const S = {
   provider: null,
   signer: null,
   contract: null,
-  mintFee: BigInt('1000000000000000000'), // 1 LCAI
+  mintFee: BigInt('0'), // Free
   collectionFee: BigInt('5000000000000000000'), // 5 LCAI
   nfts: [],        // cached on-chain NFTs
   collections: [], // cached collections
@@ -943,6 +944,37 @@ function formatLCAI(wei) {
   const n = Number(BigInt(wei)) / 1e18;
   return n % 1 === 0 ? n.toString() : n.toFixed(3).replace(/\.?0+$/, '');
 }
+
+// ── USD PRICING ──
+let LCAI_USD_PRICE = 0.004; // fallback, refreshed on load
+const MINT_FEE_USD = 0;        // Minting is free
+const COLLECTION_FEE_USD = 1.00; // $1.00 USD
+
+async function fetchLcaiPrice() {
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=lightchain-ai&vs_currencies=usd');
+    const d = await r.json();
+    if (d['lightchain-ai']?.usd > 0) LCAI_USD_PRICE = d['lightchain-ai'].usd;
+  } catch(e) { /* use fallback */ }
+  updateFeeDisplays();
+  return LCAI_USD_PRICE;
+}
+
+function usdToLcaiStr(usd) {
+  if (!usd || usd <= 0) return '0';
+  return (usd / LCAI_USD_PRICE).toFixed(4);
+}
+
+function updateFeeDisplays() {
+  const lcaiStr = usdToLcaiStr(COLLECTION_FEE_USD);
+  const el1 = document.getElementById('colFeeDisplay');
+  const el2 = document.getElementById('colFeeTotal');
+  const el3 = document.getElementById('settingsColFee');
+  if (el1) el1.textContent = '$1.00 (~' + lcaiStr + ' LCAI)';
+  if (el2) el2.textContent = '$1.00 (~' + lcaiStr + ' LCAI)';
+  if (el3) el3.textContent = '$1.00 (~' + lcaiStr + ' LCAI)';
+}
+
 function timeAgo(ts) {
   const s = Math.floor((Date.now()-ts)/1000);
   if (s < 60) return s + 's ago';
@@ -1092,9 +1124,10 @@ async function loadContractData() {
     document.getElementById('statNFTs').textContent = (parseInt(nextTok,16)-1).toString();
     document.getElementById('statCols').textContent = (parseInt(nextCol,16)-1).toString();
     S.mintFee = BigInt(nextTok); // placeholder
-    document.getElementById('settingsMintFee').textContent = formatLCAI(fee) + ' LCAI';
-    document.getElementById('fpMintFee').textContent = formatLCAI(fee) + ' LCAI';
-    document.getElementById('fpTotal').textContent = formatLCAI(fee) + ' LCAI';
+    document.getElementById('fpMintFee').textContent = 'Free';
+    document.getElementById('fpTotal').textContent = 'Free';
+    S.mintFee = BigInt(0);
+    fetchLcaiPrice();
   } catch(e) { console.warn('Contract read failed:', e); }
 }
 
@@ -1126,27 +1159,30 @@ function abiEncode(method, params) {
 }
 
 // ── SEND TRANSACTION ──
-async function sendTx(method, params, value) {
+async function sendTx(method, params, valueEth) {
   if (!S.wallet) { await connectWallet(); if (!S.wallet) return null; }
-  const selector = {
-    'mint': '0xd85d3d27',
-    'createCollection': '0x6d7a9c67',
-    'listForSale': '0x73e3c53b',
-    'buy': '0xa6f2ae3a',
-    'makeOffer': '0xef7c1e18',
-    'acceptOffer': '0x41637561',
-    'unlist': '0x7d3f4af5',
-    'approve': '0x095ea7b3',
-  };
-  // For the actual deployment we'll use window.ethereum.request eth_sendTransaction
-  // with properly encoded calldata. For now, show "coming soon" if not deployed.
   if (CONTRACT_ADDR === 'DEPLOY_ME') {
-    toast('Contract not deployed yet — coming soon!', 'info', 3000);
+    toast('Contract not deployed yet', 'info', 3000);
     return null;
   }
-  toast('Opening Trust Wallet…', 'info');
-  // Full ABI encoding would go here via a minimal encoder
-  return null;
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const contract = new ethers.Contract(CONTRACT_ADDR, ABI, signer);
+    const valFloat = valueEth ? parseFloat(valueEth) : 0;
+    const value = valFloat > 0
+      ? ethers.utils.parseEther(valFloat.toFixed(9))
+      : ethers.BigNumber.from(0);
+    toast('Confirm in your wallet…', 'info');
+    const tx = await contract[method](...params, { value });
+    toast('⏳ Confirming on Lightchain…', 'info', 20000);
+    const receipt = await tx.wait();
+    return receipt;
+  } catch(e) {
+    if (e.code === 4001 || e.code === 'ACTION_REJECTED') toast('Transaction cancelled', 'err');
+    else toast('Error: ' + (e.reason || e.message || 'Unknown error'), 'err');
+    return null;
+  }
 }
 
 // ── RENDER DISCOVER ──
@@ -1469,8 +1505,8 @@ function handleColImageSelect(e) {
 function updateFeePreview() {
   const royalty = parseFloat(document.getElementById('mintRoyalty')?.value || 5);
   document.getElementById('fpRoyalty').textContent = royalty + '% (on resales)';
-  document.getElementById('fpMintFee').textContent = formatLCAI(S.mintFee.toString()) + ' LCAI';
-  document.getElementById('fpTotal').textContent = formatLCAI(S.mintFee.toString()) + ' LCAI';
+  document.getElementById('fpMintFee').textContent = 'Free';
+  document.getElementById('fpTotal').textContent = 'Free';
 }
 
 function setStudioTab(tab) {
@@ -1527,7 +1563,7 @@ async function mintNFT() {
     const royaltyBps = Math.round(royaltyPct * 100);
 
     btn.textContent = '⏳ Minting on Lightchain…';
-    const result = await sendTx('mint', [toAddr, tokenURI, royaltyBps, collectionId, S.selectedOrigin], formatLCAI(S.mintFee.toString()));
+    const result = await sendTx('mint', [toAddr, tokenURI, royaltyBps, collectionId, S.selectedOrigin], '0');
     if (result !== null) {
       toast('🎉 NFT minted successfully!', 'ok', 5000);
       addNotification('✨', 'NFT Minted!', `"${name}" was successfully minted on Lightchain.`);
@@ -1564,7 +1600,9 @@ async function createCollection() {
   let imageURI = '';
   if (S.uploadedColFile) imageURI = await uploadToR2(S.uploadedColFile);
   const mintPriceWei = mintPrice > 0 ? Math.round(mintPrice*1e18).toString() : '0';
-  await sendTx('createCollection', [name, desc, imageURI, maxSupply, mintPriceWei, launchTs], '5');
+  await fetchLcaiPrice();
+  const colFeeEth = usdToLcaiStr(COLLECTION_FEE_USD);
+  await sendTx('createCollection', [name, desc, imageURI, maxSupply, mintPriceWei, launchTs], colFeeEth);
   if (CONTRACT_ADDR === 'DEPLOY_ME') return;
   toast('Collection deployed!', 'ok', 5000);
   addNotification('🗂️', 'Collection Created', `"${name}" is live on Lightchain.`);
