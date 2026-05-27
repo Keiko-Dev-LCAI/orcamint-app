@@ -1787,7 +1787,23 @@ async function sendSupport() {
   msgs.innerHTML += `<div class="support-msg bot" id="supportTyping">⟳ Thinking…</div>`;
   msgs.scrollTop = msgs.scrollHeight;
   try {
-    const ans = await aivmCall(`You are a helpful assistant for OrcaMint, the first NFT platform on Lightchain. Answer this question concisely: ${q}`);
+    const ans = await aivmCall(`You are a support assistant for OrcaMint, the first NFT marketplace on Lightchain AI (chain ID 9200). Answer the user question accurately using only these facts:
+
+WALLETS: OrcaMint works with any EVM-compatible wallet. The recommended wallets are Trust Wallet and MetaMask. There is NO official Lightchain wallet app. Users connect via the Connect Wallet button on the site.
+
+MINTING: Minting a single NFT is free (you only pay a small gas fee in LCAI). Creating a collection costs $1 USD paid in LCAI at the current exchange rate. Gas fees on Lightchain are very low (fractions of a cent).
+
+ROYALTIES: Set during minting, between 0-15%. Paid automatically on every secondary sale via the ERC-2981 standard. Goes directly to the creator wallet.
+
+COLLECTIONS: Create a collection first in Studio, then mint NFTs into it. Collection creation costs $1 USD in LCAI.
+
+TOKEN: LCAI is the native token of Lightchain AI. You need a small amount for gas fees. Get LCAI at lcai.io or major exchanges.
+
+NETWORK: Lightchain mainnet, chain ID 9200, RPC https://rpc.mainnet.lightchain.ai
+
+If you do not know the answer from these facts, say so honestly rather than guessing. Keep answers concise.
+
+User question: ${q}`);
     document.getElementById('supportTyping').textContent = ans.trim();
   } catch(e) {
     const msg = e.name === 'AbortError' ? 'AIVM timed out. Please try again.' : 'AIVM is busy right now. Try again in a moment.';
