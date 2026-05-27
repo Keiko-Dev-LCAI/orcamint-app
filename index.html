@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OrcaMint — NFT Platform on Lightchain</title>
+<style>
+:root {
+  --bg: #0d0d1a;
+  --bg2: #13132a;
+  --card: #1a1a2e;
+  --card2: #1f1f38;
+  --border: #2a2a4a;
+  --cyan: #00e5ff;
+  --cyan2: #00b8d4;
+  --purple: #7c4dff;
+  --green: #00e676;
+  --red: #ff5252;
+  --yellow: #ffd740;
+  --text: #e8e8f0;
+  --text2: #9898b8;
+  --text3: #5a5a7a;
+  --sidebar-w: 220px;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; overflow-x: hidden; }
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width: var(--sidebar-w); min-height: 100vh; background: var(--bg2);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  position: fixed; left: 0; top: 0; z-index: 100; transition: transform .25s;
+}
+.sidebar-logo { padding: 20px 16px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+.sidebar-logo img { width: 34px; height: 34px; border-radius: 50%; }
+.sidebar-logo .logo-text { font-size: 1.2rem; font-weight: 700; color: var(--cyan); letter-spacing: -.5px; }
+.sidebar-logo .logo-sub { font-size: .65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+
+.nav-section { padding: 10px 0; }
+.nav-label { font-size: .65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 16px 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 16px;
+  cursor: pointer; border-radius: 0; transition: all .15s; color: var(--text2);
+  font-size: .9rem; position: relative;
+}
+.nav-item:hover { background: var(--card); color: var(--text); }
+.nav-item.active { background: linear-gradient(90deg, rgba(0,229,255,.12), transparent); color: var(--cyan); border-left: 3px solid var(--cyan); padding-left: 13px; }
+.nav-item .nav-icon { font-size: 1.1rem; width: 22px; text-align: center; }
+.nav-badge { margin-left: auto; background: var(--cyan); color: #000; font-size: .6rem; font-weight: 700; padding: 2px 6px; border-radius: 10px; }
+.nav-badge.red { background: var(--red); color: #fff; }
+
+.sidebar-wallet { margin-top: auto; padding: 14px 12px; border-top: 1px solid var(--border); }
+#walletBtn {
+  width: 100%; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
+  border: none; color: #000; font-weight: 700; font-size: .85rem;
+  cursor: pointer; transition: opacity .2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+#walletBtn:hover { opacity: .85; }
+#walletAddr { font-size: .72rem; color: var(--text3); text-align: center; margin-top: 6px; word-break: break-all; }
+
+/* ── MAIN ── */
+#main { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── TOPBAR ── */
+#topbar {
+  height: 60px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; padding: 0 24px; position: sticky; top: 0; z-index: 50;
+}
+#searchBox {
+  flex: 1; max-width: 400px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 24px; padding: 8px 16px 8px 36px; color: var(--text); font-size: .9rem; outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239898b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 12px center;
+}
+#searchBox::placeholder { color: var(--text3); }
+#searchBox:focus { border-color: var(--cyan); }
+.topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--card);
+  border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 1rem; transition: all .15s; color: var(--text2); position: relative;
+}
+.icon-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.notif-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; background: var(--red); border-radius: 50%; border: 2px solid var(--bg2); }
+
+/* ── PAGE CONTENT ── */
+#page { flex: 1; padding: 0; overflow: auto; }
+.page-section { display: none; }
+.page-section.active { display: block; }
+
+/* ── HERO BANNER ── */
+.hero {
+  position: relative; height: 340px; overflow: hidden;
+  background: linear-gradient(135deg, #0d0d3a 0%, #1a0a3a 50%, #0a2030 100%);
+  display: flex; align-items: center; padding: 0 48px;
+}
+.hero-bg {
+  position: absolute; inset: 0; opacity: .25;
+  background: radial-gradient(ellipse at 20% 50%, #7c4dff 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 20%, #00e5ff 0%, transparent 40%),
+              radial-gradient(ellipse at 60% 80%, #ff4081 0%, transparent 35%);
+}
+.hero-content { position: relative; z-index: 2; }
+.hero h1 { font-size: 2.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 12px; }
+.hero h1 span { background: linear-gradient(90deg, var(--cyan), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero p { color: var(--text2); font-size: 1.05rem; max-width: 480px; margin-bottom: 24px; }
+.hero-btns { display: flex; gap: 12px; }
+.btn { padding: 11px 22px; border-radius: var(--radius-sm); border: none; cursor: pointer; font-weight: 600; font-size: .9rem; transition: all .2s; }
+.btn-primary { background: linear-gradient(135deg, var(--cyan), var(--purple)); color: #000; }
+.btn-primary:hover { opacity: .85; transform: translateY(-1px); }
+.btn-outline { background: transparent; border: 1.5px solid var(--cyan); color: var(--cyan); }
+.btn-outline:hover { background: rgba(0,229,255,.1); }
+.btn-sm { padding: 7px 14px; font-size: .82rem; }
+.btn-danger { background: var(--red); color: #fff; }
+
+.hero-stats { position: absolute; right: 48px; bottom: 32px; display: flex; gap: 32px; }
+.hero-stat { text-align: center; }
+.hero-stat .val { font-size: 1.6rem; font-weight: 800; color: var(--cyan); }
+.hero-stat .lbl { font-size: .72rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ── SECTION HEADERS ── */
+.sec-header { display: flex; align-items: center; justify-content: space-between; padding: 28px 24px 16px; }
+.sec-title { font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.sec-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); display: inline-block; }
+.sec-link { color: var(--cyan); font-size: .85rem; cursor: pointer; text-decoration: none; }
+.sec-link:hover { text-decoration: underline; }
+
+/* ── NFT GRID ── */
+.nft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 0 24px 24px; }
+.nft-card {
+  background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);
+  overflow: hidden; cursor: pointer; transition: all .2s; position: relative;
+}
+.nft-card:hover { border-color: var(--cyan); transform: translateY(-3px); box-shadow: 0 8px 32px rgba(0,229,255,.12); }
+.nft-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--card2); display: flex; align-items: center; justify-content: center; font-size: 3rem; }
+.nft-img img { width: 100%; height: 100%; object-fit: cover; }
+.nft-info { padding: 12px; }
+.nft-name { font-weight: 600; font-size: .92rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nft-collection { font-size: .75rem; color: var(--cyan); margin-bottom: 8px; }
+.nft-footer { display: flex; align-items: center; justify-content: space-between; }
+.nft-price { font-size: .82rem; color: var(--text2); }
+.nft-price strong { color: var(--text); font-size: .9rem; }
+.nft-origin { font-size: .65rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+.origin-0 { background: rgba(124,77,255,.2); color: #b39ddb; } /* Artist Upload */
+.origin-1 { background: rgba(0,229,255,.15); color: var(--cyan); } /* AIVM Enhanced */
+.origin-2 { background: rgba(0,230,118,.15); color: var(--green); } /* AIVM Generated */
+.nft-like { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,.6); border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: .85rem; cursor: pointer; transition: all .15s; }
+.nft-like:hover { background: rgba(255,82,82,.3); }
+
+/* ── COLLECTION GRID ── */
+.col-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; padding: 0 24px 32px; }
+.col-card {
+  background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);
+  overflow: hidden; cursor: pointer; transition: all .2s;
+}
+.col-card:hover { border-color: var(--purple); transform: translateY(-2px); }
+.col-banner { height: 100px; background: linear-gradient(135deg, var(--bg2), var(--card2)); position: relative; overflow: hidden; }
+.col-banner img { width: 100%; height: 100%; object-fit: cover; }
+.col-avatar { width: 52px; height: 52px; border-radius: 50%; border: 3px solid var(--card); position: absolute; bottom: -22px; left: 16px; background: var(--card2); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+.col-body { padding: 28px 16px 16px; }
+.col-name { font-weight: 700; font-size: 1rem; margin-bottom: 2px; }
+.col-by { font-size: .75rem; color: var(--text2); margin-bottom: 10px; }
+.col-stats { display: flex; gap: 16px; }
+.col-stat { font-size: .75rem; }
+.col-stat .v { font-weight: 700; color: var(--cyan); }
+.col-stat .l { color: var(--text3); font-size: .68rem; }
+
+/* ── DROPS ── */
+.drops-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 0 24px 32px; }
+.drop-card {
+  background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);
+  overflow: hidden; transition: all .2s;
+}
+.drop-card:hover { border-color: var(--cyan); }
+.drop-banner { height: 160px; background: linear-gradient(135deg, #1a0a3a, #0a2030); position: relative; display: flex; align-items: center; justify-content: center; font-size: 4rem; overflow: hidden; }
+.drop-banner img { width: 100%; height: 100%; object-fit: cover; }
+.drop-status { position: absolute; top: 10px; left: 10px; padding: 3px 10px; border-radius: 10px; font-size: .72rem; font-weight: 700; }
+.drop-live { background: var(--red); color: #fff; animation: pulse 1.5s infinite; }
+.drop-soon { background: var(--yellow); color: #000; }
+.drop-ended { background: var(--text3); color: #fff; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+.drop-body { padding: 16px; }
+.drop-name { font-weight: 700; margin-bottom: 4px; }
+.drop-by { font-size: .78rem; color: var(--text2); margin-bottom: 10px; }
+.drop-countdown { display: flex; gap: 10px; margin-bottom: 12px; }
+.countdown-unit { text-align: center; background: var(--bg); padding: 6px 10px; border-radius: var(--radius-sm); min-width: 46px; }
+.countdown-unit .n { font-size: 1.2rem; font-weight: 800; color: var(--cyan); }
+.countdown-unit .u { font-size: .6rem; color: var(--text3); text-transform: uppercase; }
+.drop-info { display: flex; justify-content: space-between; font-size: .8rem; color: var(--text2); }
+.drop-info strong { color: var(--text); }
+.progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 10px 0 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--purple)); border-radius: 2px; transition: width .3s; }
+
+/* ── STUDIO ── */
+.studio-wrap { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
+.studio-tabs { display: flex; gap: 4px; background: var(--card); border-radius: var(--radius); padding: 4px; margin-bottom: 28px; }
+.studio-tab { flex: 1; padding: 9px; text-align: center; border-radius: var(--radius-sm); cursor: pointer; font-size: .88rem; font-weight: 600; color: var(--text2); transition: all .15s; }
+.studio-tab.active { background: var(--bg); color: var(--cyan); }
+
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px 24px;
+  text-align: center; cursor: pointer; transition: all .2s; background: var(--bg); margin-bottom: 24px;
+}
+.upload-zone:hover, .upload-zone.drag { border-color: var(--cyan); background: rgba(0,229,255,.04); }
+.upload-zone .upload-icon { font-size: 2.5rem; margin-bottom: 10px; }
+.upload-zone p { color: var(--text2); font-size: .9rem; }
+.upload-zone .upload-hint { font-size: .78rem; color: var(--text3); margin-top: 6px; }
+.upload-preview { width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--radius-sm); display: none; margin-bottom: 16px; }
+
+.form-group { margin-bottom: 18px; }
+.form-label { display: block; font-size: .82rem; font-weight: 600; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.form-input, .form-textarea, .form-select {
+  width: 100%; background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text); font-size: .9rem; outline: none; transition: border .15s;
+}
+.form-input:focus, .form-textarea:focus, .form-select:focus { border-color: var(--cyan); }
+.form-textarea { min-height: 90px; resize: vertical; font-family: inherit; }
+.form-select { appearance: none; cursor: pointer; }
+.form-hint { font-size: .75rem; color: var(--text3); margin-top: 4px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.origin-picker { display: flex; gap: 10px; }
+.origin-opt {
+  flex: 1; padding: 10px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  cursor: pointer; text-align: center; transition: all .15s; background: var(--bg);
+}
+.origin-opt:hover { border-color: var(--text3); }
+.origin-opt.selected { border-color: var(--cyan); background: rgba(0,229,255,.07); }
+.origin-opt .ori-icon { font-size: 1.3rem; margin-bottom: 4px; }
+.origin-opt .ori-label { font-size: .72rem; font-weight: 600; color: var(--text2); }
+
+.aivm-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.aivm-btn { padding: 5px 12px; border-radius: 16px; background: rgba(0,229,255,.1); border: 1px solid rgba(0,229,255,.3); color: var(--cyan); font-size: .78rem; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.aivm-btn:hover { background: rgba(0,229,255,.2); }
+.aivm-btn:disabled { opacity: .4; cursor: wait; }
+.aivm-spinning::after { content: ' ⟳'; animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.fee-preview { background: var(--card); border-radius: var(--radius-sm); padding: 14px 16px; margin: 20px 0; border: 1px solid var(--border); }
+.fee-row { display: flex; justify-content: space-between; font-size: .85rem; padding: 3px 0; }
+.fee-row .lbl { color: var(--text2); }
+.fee-row .val { font-weight: 600; }
+.fee-total { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
+.fee-total .val { color: var(--cyan); }
+
+/* ── PROFILE ── */
+.profile-banner { height: 200px; background: linear-gradient(135deg, #1a0a3a, #0a1a3a, #0a2a2a); position: relative; overflow: hidden; }
+.profile-banner-img { width: 100%; height: 100%; object-fit: cover; }
+.profile-avatar { width: 90px; height: 90px; border-radius: 50%; border: 4px solid var(--bg); background: var(--card2); position: absolute; bottom: -45px; left: 32px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; overflow: hidden; }
+.profile-header { padding: 56px 32px 20px; display: flex; align-items: flex-start; justify-content: space-between; }
+.profile-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
+.profile-addr { font-size: .82rem; color: var(--text3); font-family: monospace; cursor: pointer; }
+.profile-addr:hover { color: var(--cyan); }
+.profile-stats { display: flex; gap: 28px; margin-top: 16px; padding: 0 32px 20px; }
+.profile-stat { text-align: center; }
+.profile-stat .v { font-size: 1.3rem; font-weight: 800; color: var(--cyan); }
+.profile-stat .l { font-size: .72rem; color: var(--text3); text-transform: uppercase; }
+.profile-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 32px; gap: 4px; }
+.profile-tab { padding: 10px 18px; cursor: pointer; font-size: .88rem; font-weight: 600; color: var(--text2); border-bottom: 2px solid transparent; transition: all .15s; }
+.profile-tab:hover { color: var(--text); }
+.profile-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.profile-content { padding: 24px 32px; }
+
+/* ── NFT DETAIL MODAL ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: var(--card); border-radius: 16px; border: 1px solid var(--border); max-width: 900px; width: 100%; max-height: 90vh; overflow: auto; position: relative; }
+.modal-close { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%; background: var(--bg2); border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 1.1rem; z-index: 5; }
+.modal-close:hover { color: var(--text); border-color: var(--cyan); }
+.nft-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.nft-detail-img { background: var(--bg); display: flex; align-items: center; justify-content: center; min-height: 400px; border-radius: 16px 0 0 16px; overflow: hidden; }
+.nft-detail-img img { width: 100%; height: 100%; object-fit: contain; max-height: 500px; }
+.nft-detail-info { padding: 28px; overflow-y: auto; max-height: 90vh; }
+.nft-detail-collection { color: var(--cyan); font-size: .82rem; margin-bottom: 8px; cursor: pointer; }
+.nft-detail-name { font-size: 1.6rem; font-weight: 800; margin-bottom: 8px; }
+.nft-detail-origin { margin-bottom: 14px; }
+.owner-row { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--text2); margin-bottom: 20px; }
+.owner-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--card2); display: flex; align-items: center; justify-content: center; font-size: .75rem; }
+.price-box { background: var(--bg); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 16px; }
+.price-box .lbl { font-size: .78rem; color: var(--text3); margin-bottom: 4px; }
+.price-box .price { font-size: 1.8rem; font-weight: 800; color: var(--text); }
+.price-box .price span { font-size: 1rem; color: var(--text2); margin-left: 6px; }
+.detail-actions { display: flex; gap: 10px; margin-bottom: 20px; }
+.detail-actions .btn { flex: 1; }
+.detail-section { margin-bottom: 18px; }
+.detail-section-title { font-size: .78rem; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.attr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.attr-box { background: rgba(0,229,255,.06); border: 1px solid rgba(0,229,255,.2); border-radius: var(--radius-sm); padding: 8px; text-align: center; }
+.attr-box .at { font-size: .65rem; color: var(--cyan); text-transform: uppercase; letter-spacing: .5px; }
+.attr-box .av { font-size: .85rem; font-weight: 600; }
+
+/* ── OFFERS TABLE ── */
+.offers-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.offers-table th { text-align: left; padding: 6px 10px; color: var(--text3); font-weight: 600; font-size: .72rem; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+.offers-table td { padding: 8px 10px; border-bottom: 1px solid rgba(42,42,74,.5); }
+
+/* ── NOTIFICATIONS PANEL ── */
+.notif-panel { position: fixed; top: 60px; right: 0; width: 340px; height: calc(100vh - 60px); background: var(--card); border-left: 1px solid var(--border); z-index: 90; transform: translateX(100%); transition: transform .25s; overflow-y: auto; }
+.notif-panel.open { transform: translateX(0); }
+.notif-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.notif-header h3 { font-size: 1rem; font-weight: 700; }
+.notif-clear { font-size: .78rem; color: var(--cyan); cursor: pointer; }
+.notif-item { padding: 14px 20px; border-bottom: 1px solid rgba(42,42,74,.5); display: flex; gap: 12px; transition: background .15s; }
+.notif-item:hover { background: var(--card2); }
+.notif-item.unread { background: rgba(0,229,255,.05); }
+.notif-icon { font-size: 1.3rem; flex-shrink: 0; }
+.notif-body { flex: 1; }
+.notif-body p { font-size: .84rem; margin-bottom: 2px; }
+.notif-body time { font-size: .72rem; color: var(--text3); }
+.notif-empty { padding: 40px; text-align: center; color: var(--text3); }
+
+/* ── SUPPORT WIDGET ── */
+#supportBtn { position: fixed; bottom: 24px; right: 24px; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, var(--cyan), var(--purple)); border: none; cursor: pointer; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(0,229,255,.3); z-index: 150; transition: transform .2s; }
+#supportBtn:hover { transform: scale(1.1); }
+.support-panel { position: fixed; bottom: 84px; right: 24px; width: 320px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; z-index: 150; display: none; box-shadow: 0 8px 40px rgba(0,0,0,.5); overflow: hidden; }
+.support-panel.open { display: block; }
+.support-header { background: linear-gradient(135deg, var(--bg2), #1a0a3a); padding: 20px 16px; }
+.support-header h3 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+.support-header p { font-size: .8rem; color: var(--text2); }
+.support-faqs { padding: 12px; }
+.faq-chip { padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: .82rem; cursor: pointer; margin-bottom: 8px; display: block; width: 100%; text-align: left; color: var(--text); transition: all .15s; }
+.faq-chip:hover { border-color: var(--cyan); color: var(--cyan); }
+.support-chat { border-top: 1px solid var(--border); }
+.support-msgs { height: 180px; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.support-msg { padding: 8px 12px; border-radius: var(--radius-sm); font-size: .82rem; max-width: 85%; }
+.support-msg.bot { background: var(--bg); color: var(--text); align-self: flex-start; }
+.support-msg.user { background: rgba(0,229,255,.15); color: var(--cyan); align-self: flex-end; }
+.support-input-row { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border); }
+.support-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 7px 10px; color: var(--text); font-size: .82rem; outline: none; }
+.support-send { padding: 7px 12px; background: var(--cyan); border: none; border-radius: var(--radius-sm); color: #000; font-weight: 700; cursor: pointer; font-size: .82rem; }
+
+/* ── TOAST ── */
+#toastZone { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 999; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+.toast { padding: 10px 20px; border-radius: 24px; font-size: .88rem; font-weight: 600; animation: toastIn .3s ease; pointer-events: auto; max-width: 380px; text-align: center; }
+.toast.ok { background: #00e676; color: #000; }
+.toast.err { background: #ff5252; color: #fff; }
+.toast.info { background: #1a1a2e; color: var(--cyan); border: 1px solid var(--cyan); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── ACTIVITY TABLE ── */
+.activity-table { width: 100%; border-collapse: collapse; }
+.activity-table th { text-align: left; padding: 10px 16px; color: var(--text3); font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+.activity-table td { padding: 12px 16px; border-bottom: 1px solid rgba(42,42,74,.4); font-size: .85rem; vertical-align: middle; }
+.activity-table tr:hover td { background: var(--card2); }
+.event-badge { padding: 3px 8px; border-radius: 10px; font-size: .72rem; font-weight: 700; }
+.ev-mint { background: rgba(0,230,118,.15); color: var(--green); }
+.ev-sale { background: rgba(0,229,255,.15); color: var(--cyan); }
+.ev-list { background: rgba(124,77,255,.15); color: #b39ddb; }
+.ev-offer { background: rgba(255,215,64,.15); color: var(--yellow); }
+
+/* ── EMPTY STATE ── */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text3); }
+.empty-state .big-icon { font-size: 3.5rem; margin-bottom: 14px; }
+.empty-state h3 { font-size: 1.1rem; color: var(--text2); margin-bottom: 8px; }
+.empty-state p { font-size: .88rem; max-width: 300px; margin: 0 auto 20px; }
+
+/* ── MISC ── */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 10px; font-size: .72rem; font-weight: 600; }
+.badge-live { background: rgba(255,82,82,.15); color: var(--red); }
+.badge-new { background: rgba(0,229,255,.15); color: var(--cyan); }
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+.addr-short { font-family: monospace; font-size: .8rem; color: var(--text3); }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.gap-8 { gap: 8px; }
+.text-cyan { color: var(--cyan); }
+.text-muted { color: var(--text3); }
+.fw700 { font-weight: 700; }
+.mb8 { margin-bottom: 8px; }
+.mb16 { margin-bottom: 16px; }
+.loading-spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--cyan); border-radius: 50%; animation: spin .7s linear infinite; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+@media (max-width: 768px) {
+  #sidebar { transform: translateX(-100%); }
+  #sidebar.open { transform: translateX(0); }
+  #main { margin-left: 0; }
+  .nft-detail-grid { grid-template-columns: 1fr; }
+  .nft-detail-img { border-radius: 16px 16px 0 0; min-height: 250px; }
+  .hero { padding: 0 24px; }
+  .hero h1 { font-size: 2rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ── -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <img src="orca-icon.png" alt="OrcaMint">
+    <div>
+      <div class="logo-text">OrcaMint</div>
+      <div class="logo-sub">Lightchain NFTs</div>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Browse</div>
+    <div class="nav-item active" onclick="showPage('discover')">
+      <span class="nav-icon">🔍</span> Discover
+    </div>
+    <div class="nav-item" onclick="showPage('collections')">
+      <span class="nav-icon">🗂️</span> Collections
+    </div>
+    <div class="nav-item" onclick="showPage('drops')">
+      <span class="nav-icon">🚀</span> Drops
+      <span class="nav-badge red" id="liveDropsBadge" style="display:none">LIVE</span>
+    </div>
+    <div class="nav-item" onclick="showPage('activity')">
+      <span class="nav-icon">📊</span> Activity
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Create</div>
+    <div class="nav-item" onclick="showPage('studio')">
+      <span class="nav-icon">🎨</span> Studio
+    </div>
+    <div class="nav-item" onclick="showPage('profile')">
+      <span class="nav-icon">👤</span> My Profile
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">More</div>
+    <div class="nav-item" onclick="showPage('settings')">
+      <span class="nav-icon">⚙️</span> Settings
+    </div>
+  </div>
+
+  <div class="sidebar-wallet">
+    <button id="walletBtn" onclick="connectWallet()">
+      <span id="walletBtnIcon">🔗</span>
+      <span id="walletBtnText">Connect Wallet</span>
+    </button>
+    <div id="walletAddr"></div>
+  </div>
+</nav>
+
+<!-- ── MAIN ── -->
+<div id="main">
+  <div id="topbar">
+    <input id="searchBox" type="text" placeholder="Search NFTs, collections, addresses…" onkeyup="handleSearch(event)">
+    <div class="topbar-actions">
+      <div class="icon-btn" onclick="toggleNotifs()" title="Notifications">
+        🔔
+        <span class="notif-dot" id="notifDot" style="display:none"></span>
+      </div>
+      <div class="icon-btn" onclick="showPage('studio')" title="Mint NFT">✨</div>
+      <div class="icon-btn" id="mobileMenuBtn" onclick="toggleSidebar()" style="display:none">☰</div>
+    </div>
+  </div>
+
+  <div id="page">
+
+    <!-- ── DISCOVER ── -->
+    <div id="sec-discover" class="page-section active">
+      <div class="hero">
+        <div class="hero-bg"></div>
+        <div class="hero-content">
+          <h1>Create. Mint.<br><span>Own forever.</span></h1>
+          <p>The first NFT platform built natively on Lightchain. Upload your art, mint it on-chain, earn royalties forever.</p>
+          <div class="hero-btns">
+            <button class="btn btn-primary" onclick="showPage('studio')">✨ Start Minting</button>
+            <button class="btn btn-outline" onclick="showPage('collections')">Browse Collections</button>
+          </div>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat"><div class="val" id="statNFTs">—</div><div class="lbl">NFTs Minted</div></div>
+          <div class="hero-stat"><div class="val" id="statCols">—</div><div class="lbl">Collections</div></div>
+          <div class="hero-stat"><div class="val" id="statFloor">1 LCAI</div><div class="lbl">Mint Fee</div></div>
+        </div>
+      </div>
+
+      <div class="sec-header">
+        <div class="sec-title"><span class="dot"></span> Featured NFTs</div>
+        <span class="sec-link" onclick="showPage('collections')">View all →</span>
+      </div>
+      <div class="nft-grid" id="featuredGrid"></div>
+
+      <div class="sec-header">
+        <div class="sec-title"><span class="dot"></span> Trending Collections</div>
+        <span class="sec-link" onclick="showPage('collections')">View all →</span>
+      </div>
+      <div class="col-grid" id="trendingCols"></div>
+
+      <div class="sec-header">
+        <div class="sec-title"><span class="dot"></span> Live Drops 🔴</div>
+        <span class="sec-link" onclick="showPage('drops')">All drops →</span>
+      </div>
+      <div class="drops-grid" id="liveDropsGrid"></div>
+    </div>
+
+    <!-- ── COLLECTIONS ── -->
+    <div id="sec-collections" class="page-section">
+      <div style="padding:28px 24px 16px; display:flex; align-items:center; justify-content:space-between;">
+        <div class="sec-title"><span class="dot"></span> All Collections</div>
+        <button class="btn btn-primary btn-sm" onclick="showPage('studio'); setStudioTab('collection')">+ New Collection</button>
+      </div>
+      <div class="col-grid" id="allColsGrid"></div>
+    </div>
+
+    <!-- ── DROPS ── -->
+    <div id="sec-drops" class="page-section">
+      <div style="padding:28px 24px 16px;">
+        <div class="sec-title" style="margin-bottom:6px;"><span class="dot"></span> NFT Drops</div>
+        <p style="color:var(--text3);font-size:.88rem;">Scheduled launches with limited supply. Set your reminder before they sell out.</p>
+      </div>
+      <div class="drops-grid" id="allDropsGrid"></div>
+    </div>
+
+    <!-- ── STUDIO ── -->
+    <div id="sec-studio" class="page-section">
+      <div class="studio-wrap">
+        <div style="margin-bottom:24px;">
+          <h2 style="font-size:1.6rem;font-weight:800;margin-bottom:6px;">🎨 Studio</h2>
+          <p style="color:var(--text3);font-size:.9rem;">Mint your art as an NFT on Lightchain. Set your royalty once — earn forever on every resale.</p>
+        </div>
+        <div class="studio-tabs">
+          <div class="studio-tab active" id="tab-mint" onclick="setStudioTab('mint')">✨ Mint NFT</div>
+          <div class="studio-tab" id="tab-collection" onclick="setStudioTab('collection')">🗂️ Create Collection</div>
+        </div>
+
+        <!-- MINT FORM -->
+        <div id="studio-mint">
+          <div class="upload-zone" id="uploadZone" onclick="document.getElementById('artFile').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+            <div class="upload-icon">🖼️</div>
+            <p>Drop your artwork here or <strong style="color:var(--cyan)">click to browse</strong></p>
+            <div class="upload-hint">PNG, JPG, GIF, MP4 · Max 50MB · Stored on Cloudflare R2</div>
+          </div>
+          <img id="uploadPreview" class="upload-preview">
+          <input type="file" id="artFile" accept="image/*,video/mp4" style="display:none" onchange="handleFileSelect(event)">
+
+          <div class="form-group">
+            <label class="form-label">Art Origin</label>
+            <div class="origin-picker">
+              <div class="origin-opt selected" id="ori-0" onclick="selectOrigin(0)">
+                <div class="ori-icon">🎨</div>
+                <div class="ori-label">Artist Upload</div>
+              </div>
+              <div class="origin-opt" id="ori-1" onclick="selectOrigin(1)">
+                <div class="ori-icon">⚡</div>
+                <div class="ori-label">AIVM Enhanced</div>
+              </div>
+              <div class="origin-opt" id="ori-2" onclick="selectOrigin(2)">
+                <div class="ori-icon">🤖</div>
+                <div class="ori-label">AIVM Generated</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">NFT Name *</label>
+            <input class="form-input" id="mintName" placeholder="Give your NFT a name…" oninput="updateFeePreview()">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <div class="aivm-bar">
+              <button class="aivm-btn" id="aivmDescBtn" onclick="aivmGenerateDesc()">⚡ Generate with AIVM</button>
+              <span style="font-size:.72rem;color:var(--text3)">Powered by Lightchain AIVM</span>
+            </div>
+            <textarea class="form-textarea" id="mintDesc" placeholder="Describe your artwork…"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tags</label>
+            <div class="aivm-bar">
+              <button class="aivm-btn" id="aivmTagBtn" onclick="aivmGenerateTags()">⚡ Suggest Tags</button>
+            </div>
+            <input class="form-input" id="mintTags" placeholder="art, digital, abstract, orca…">
+            <div class="form-hint">Comma-separated. Helps collectors find your work.</div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Creator Royalty %</label>
+              <input class="form-input" id="mintRoyalty" type="number" min="0" max="20" value="5" oninput="updateFeePreview()">
+              <div class="form-hint">You earn this % on every resale. Max 20%.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Collection (optional)</label>
+              <select class="form-select" id="mintCollection">
+                <option value="0">None — standalone NFT</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Recipient Wallet</label>
+            <input class="form-input" id="mintTo" placeholder="0x… (leave blank to use your connected wallet)">
+          </div>
+
+          <div class="fee-preview" id="feePreview">
+            <div class="fee-row"><span class="lbl">Mint fee</span><span class="val" id="fpMintFee">1 LCAI</span></div>
+            <div class="fee-row"><span class="lbl">Your royalty on resales</span><span class="val" id="fpRoyalty">5%</span></div>
+            <div class="fee-row"><span class="lbl">Platform commission</span><span class="val">2.5% (sales only)</span></div>
+            <div class="fee-row fee-total"><span class="lbl fw700">Total to pay now</span><span class="val text-cyan" id="fpTotal">1 LCAI</span></div>
+          </div>
+
+          <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem;" onclick="mintNFT()">
+            ✨ Mint NFT on Lightchain
+          </button>
+        </div>
+
+        <!-- CREATE COLLECTION FORM -->
+        <div id="studio-collection" style="display:none">
+          <div class="upload-zone" id="colUploadZone" onclick="document.getElementById('colImgFile').click()" style="padding:28px">
+            <div class="upload-icon">🗂️</div>
+            <p>Collection cover image</p>
+            <div class="upload-hint">PNG, JPG · Recommended 500×500px</div>
+          </div>
+          <img id="colPreview" class="upload-preview">
+          <input type="file" id="colImgFile" accept="image/*" style="display:none" onchange="handleColImageSelect(event)">
+
+          <div class="form-group">
+            <label class="form-label">Collection Name *</label>
+            <input class="form-input" id="colName" placeholder="Orca Whales, Lightchain Punks…">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <div class="aivm-bar">
+              <button class="aivm-btn" onclick="aivmGenerateColDesc()">⚡ Generate with AIVM</button>
+            </div>
+            <textarea class="form-textarea" id="colDesc" placeholder="What's this collection about?"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Max Supply</label>
+              <input class="form-input" id="colMaxSupply" type="number" min="0" placeholder="0 = unlimited">
+              <div class="form-hint">0 means unlimited mints.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mint Price (LCAI)</label>
+              <input class="form-input" id="colMintPrice" type="number" min="0" step="0.1" placeholder="0 = use global fee">
+              <div class="form-hint">Override global mint fee for this collection.</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Launch Date (optional)</label>
+            <input class="form-input" id="colLaunchAt" type="datetime-local">
+            <div class="form-hint">Minting locked until this date. Leave blank to go live immediately.</div>
+          </div>
+
+          <div class="fee-preview">
+            <div class="fee-row"><span class="lbl">Collection creation fee</span><span class="val">5 LCAI</span></div>
+            <div class="fee-row fee-total"><span class="lbl fw700">Total</span><span class="val text-cyan">5 LCAI</span></div>
+          </div>
+
+          <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem;" onclick="createCollection()">
+            🗂️ Deploy Collection
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PROFILE ── -->
+    <div id="sec-profile" class="page-section">
+      <div class="profile-banner" id="profileBanner">
+        <div class="profile-avatar" id="profileAvatar">🐋</div>
+      </div>
+      <div class="profile-header">
+        <div>
+          <div class="profile-name" id="profileName">Connect wallet to view profile</div>
+          <div class="profile-addr" id="profileAddrEl" onclick="copyAddr()">—</div>
+        </div>
+        <button class="btn btn-outline btn-sm" id="shareProfileBtn" onclick="shareProfile()" style="display:none">🔗 Share Profile</button>
+      </div>
+      <div class="profile-stats">
+        <div class="profile-stat"><div class="v" id="pStatCreated">0</div><div class="l">Created</div></div>
+        <div class="profile-stat"><div class="v" id="pStatCollected">0</div><div class="l">Collected</div></div>
+        <div class="profile-stat"><div class="v" id="pStatListings">0</div><div class="l">Listed</div></div>
+        <div class="profile-stat"><div class="v" id="pStatVolume">0</div><div class="l">LCAI Volume</div></div>
+      </div>
+      <div class="profile-tabs">
+        <div class="profile-tab active" onclick="showProfileTab('created')">Created</div>
+        <div class="profile-tab" onclick="showProfileTab('collected')">Collected</div>
+        <div class="profile-tab" onclick="showProfileTab('listings')">Listings</div>
+        <div class="profile-tab" onclick="showProfileTab('activity')">Activity</div>
+      </div>
+      <div class="profile-content" id="profileContent">
+        <div class="empty-state">
+          <div class="big-icon">🔗</div>
+          <h3>Connect your wallet</h3>
+          <p>Connect your Trust Wallet to see your NFTs and activity</p>
+          <button class="btn btn-primary" onclick="connectWallet()">Connect Wallet</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ACTIVITY ── -->
+    <div id="sec-activity" class="page-section">
+      <div style="padding:28px 24px 20px;">
+        <div class="sec-title" style="margin-bottom:4px;"><span class="dot"></span> Global Activity</div>
+        <p style="color:var(--text3);font-size:.85rem;">Live mints, sales, and offers across OrcaMint</p>
+      </div>
+      <div style="padding:0 24px 32px;overflow-x:auto;">
+        <table class="activity-table" id="activityTable">
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th>Item</th>
+              <th>Price</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="activityBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div id="sec-settings" class="page-section">
+      <div style="max-width:600px;margin:0 auto;padding:32px 24px;">
+        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:20px;">⚙️ Settings</h2>
+
+        <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:16px;">
+          <div style="font-weight:700;margin-bottom:14px;">Platform Info</div>
+          <div class="fee-row"><span class="lbl">Network</span><span class="val">Lightchain (chainId 9200)</span></div>
+          <div class="fee-row"><span class="lbl">Native coin</span><span class="val">LCAI</span></div>
+          <div class="fee-row"><span class="lbl">Mint fee</span><span class="val" id="settingsMintFee">1 LCAI</span></div>
+          <div class="fee-row"><span class="lbl">Collection fee</span><span class="val">5 LCAI</span></div>
+          <div class="fee-row"><span class="lbl">Platform commission</span><span class="val">2.5%</span></div>
+          <div class="fee-row"><span class="lbl">Contract</span><span class="val addr-short" id="settingsContract">Not deployed yet</span></div>
+        </div>
+
+        <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:16px;">
+          <div style="font-weight:700;margin-bottom:14px;">Wallet</div>
+          <div class="fee-row"><span class="lbl">Connected address</span><span class="val addr-short" id="settingsWallet">—</span></div>
+          <div class="fee-row"><span class="lbl">Network status</span><span class="val" id="settingsNetwork">—</span></div>
+          <div style="margin-top:14px;display:flex;gap:10px;">
+            <button class="btn btn-outline btn-sm" onclick="connectWallet()">Reconnect</button>
+            <button class="btn btn-sm" style="background:var(--card2);color:var(--text2);border:1px solid var(--border);" onclick="disconnectWallet()">Disconnect</button>
+          </div>
+        </div>
+
+        <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px;">
+          <div style="font-weight:700;margin-bottom:14px;">About</div>
+          <p style="font-size:.85rem;color:var(--text2);line-height:1.6;">OrcaMint is the first NFT minting platform on Lightchain. Upload your art, mint it on-chain with ERC-721 + ERC-2981 royalties, and trade in the built-in marketplace. Powered by Lightchain AIVM for AI-assisted metadata.</p>
+          <div style="margin-top:12px;font-size:.78rem;color:var(--text3);">
+            Privacy-first · No email required · Wallet = your identity<br>
+            Image storage: Cloudflare R2 · AI: Lightchain AIVM
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- #page -->
+</div><!-- #main -->
+
+<!-- ── NFT DETAIL MODAL ── -->
+<div class="modal-overlay" id="nftModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeNftModal()">✕</button>
+    <div class="nft-detail-grid">
+      <div class="nft-detail-img" id="nftModalImg">
+        <span style="font-size:4rem">🖼️</span>
+      </div>
+      <div class="nft-detail-info" id="nftModalInfo"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAKE OFFER MODAL ── -->
+<div class="modal-overlay" id="offerModal">
+  <div class="modal-box" style="max-width:420px">
+    <button class="modal-close" onclick="document.getElementById('offerModal').classList.remove('open')">✕</button>
+    <div style="padding:28px">
+      <h3 style="font-size:1.2rem;font-weight:800;margin-bottom:6px;">Make an Offer</h3>
+      <p style="color:var(--text3);font-size:.85rem;margin-bottom:20px;">Your LCAI will be held until the offer expires or is accepted.</p>
+      <div class="form-group">
+        <label class="form-label">Offer Amount (LCAI)</label>
+        <input class="form-input" id="offerAmount" type="number" min="0.001" step="0.001" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expires</label>
+        <input class="form-input" id="offerExpiry" type="datetime-local">
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="submitOffer()">Submit Offer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── LIST FOR SALE MODAL ── -->
+<div class="modal-overlay" id="listModal">
+  <div class="modal-box" style="max-width:420px">
+    <button class="modal-close" onclick="document.getElementById('listModal').classList.remove('open')">✕</button>
+    <div style="padding:28px">
+      <h3 style="font-size:1.2rem;font-weight:800;margin-bottom:6px;">List for Sale</h3>
+      <p style="color:var(--text3);font-size:.85rem;margin-bottom:20px;">Set a price in LCAI. Buyers can purchase immediately or make offers.</p>
+      <div class="form-group">
+        <label class="form-label">Sale Price (LCAI)</label>
+        <input class="form-input" id="listPrice" type="number" min="0.001" step="0.001" placeholder="0.00">
+      </div>
+      <div class="fee-preview">
+        <div class="fee-row"><span class="lbl">Platform fee (2.5%)</span><span class="val" id="listFeePreview">—</span></div>
+        <div class="fee-row"><span class="lbl">Creator royalty</span><span class="val" id="listRoyaltyPreview">—</span></div>
+        <div class="fee-row fee-total"><span class="lbl fw700">You receive</span><span class="val text-cyan" id="listSellerPreview">—</span></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="submitListing()">List NFT</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── NOTIFICATIONS PANEL ── -->
+<div class="notif-panel" id="notifPanel">
+  <div class="notif-header">
+    <h3>🔔 Notifications</h3>
+    <span class="notif-clear" onclick="clearNotifs()">Clear all</span>
+  </div>
+  <div id="notifList"></div>
+</div>
+
+<!-- ── SUPPORT WIDGET ── -->
+<button id="supportBtn" onclick="toggleSupport()" title="Help & Support">💬</button>
+<div class="support-panel" id="supportPanel">
+  <div class="support-header">
+    <h3>👋 How can we help?</h3>
+    <p>Ask AIVM or browse common questions</p>
+  </div>
+  <div class="support-faqs">
+    <button class="faq-chip" onclick="supportQuestion('How do I mint an NFT?')">How do I mint an NFT?</button>
+    <button class="faq-chip" onclick="supportQuestion('How do royalties work?')">How do royalties work?</button>
+    <button class="faq-chip" onclick="supportQuestion('What wallet do I use?')">What wallet do I use?</button>
+    <button class="faq-chip" onclick="supportQuestion('How do I create a collection?')">How do I create a collection?</button>
+  </div>
+  <div class="support-chat">
+    <div class="support-msgs" id="supportMsgs">
+      <div class="support-msg bot">Hi! I'm powered by Lightchain AIVM. Ask me anything about OrcaMint. 🐋</div>
+    </div>
+    <div class="support-input-row">
+      <input class="support-input" id="supportInput" placeholder="Ask a question…" onkeydown="if(event.key==='Enter')sendSupport()">
+      <button class="support-send" onclick="sendSupport()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ZONE ── -->
+<div id="toastZone"></div>
+
+<script>
+// ── CONSTANTS ──
+const CHAIN_ID       = 9200;
+const CONTRACT_ADDR  = 'DEPLOY_ME'; // Set after deployment
+const PLATFORM_WALLET= '0x1F899FaD2C8BD70b6eF356ae6cC3c0abDbB15EB5';
+const AIVM_GATEWAY   = 'https://web-production-0ccfe.up.railway.app/api/aivm';
+const R2_UPLOAD_URL  = 'https://r2-upload.orcamint.art/upload'; // Set after R2 setup
+const R2_BASE_URL    = 'https://r2.orcamint.art';
+
+// ── CONTRACT ABI ──
+const ABI = [
+  {"inputs":[{"name":"to","type":"address"},{"name":"uri","type":"string"},{"name":"royaltyBps","type":"uint96"},{"name":"collectionId","type":"uint256"},{"name":"origin","type":"uint8"}],"name":"mint","outputs":[{"name":"tokenId","type":"uint256"}],"stateMutability":"payable","type":"function"},
+  {"inputs":[{"name":"colName","type":"string"},{"name":"description","type":"string"},{"name":"imageURI","type":"string"},{"name":"maxSupply","type":"uint256"},{"name":"mintPrice","type":"uint256"},{"name":"launchAt","type":"uint256"}],"name":"createCollection","outputs":[{"name":"colId","type":"uint256"}],"stateMutability":"payable","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"},{"name":"price","type":"uint256"}],"name":"listForSale","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"}],"name":"unlist","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"}],"name":"buy","outputs":[],"stateMutability":"payable","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"},{"name":"expiresAt","type":"uint256"}],"name":"makeOffer","outputs":[],"stateMutability":"payable","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"},{"name":"offerIndex","type":"uint256"}],"name":"acceptOffer","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"}],"name":"ownerOf","outputs":[{"name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"name":"","type":"string"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"},{"name":"salePrice","type":"uint256"}],"name":"royaltyInfo","outputs":[{"name":"receiver","type":"address"},{"name":"amount","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"","type":"uint256"}],"name":"listings","outputs":[{"name":"seller","type":"address"},{"name":"price","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"}],"name":"getOffers","outputs":[{"components":[{"name":"buyer","type":"address"},{"name":"amount","type":"uint256"},{"name":"expiresAt","type":"uint256"}],"name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"","type":"uint256"}],"name":"tokenOrigin","outputs":[{"name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"colId","type":"uint256"}],"name":"getCollection","outputs":[{"components":[{"name":"id","type":"uint256"},{"name":"creator","type":"address"},{"name":"name","type":"string"},{"name":"description","type":"string"},{"name":"imageURI","type":"string"},{"name":"maxSupply","type":"uint256"},{"name":"mintCount","type":"uint256"},{"name":"mintPrice","type":"uint256"},{"name":"launchAt","type":"uint256"},{"name":"exists","type":"bool"}],"name":"","type":"tuple"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"nextTokenId","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"nextCollectionId","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"mintFee","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"collectionFee","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"","type":"uint256"}],"name":"hiddenTokens","outputs":[{"name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"","type":"uint256"}],"name":"tokenCollection","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"tokenId","type":"uint256"}],"name":"getApproved","outputs":[{"name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"approved","type":"address"},{"name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"nonpayable","type":"function"}
+];
+
+// ── STATE ──
+const S = {
+  wallet: null,
+  provider: null,
+  signer: null,
+  contract: null,
+  mintFee: BigInt('1000000000000000000'), // 1 LCAI
+  collectionFee: BigInt('5000000000000000000'), // 5 LCAI
+  nfts: [],        // cached on-chain NFTs
+  collections: [], // cached collections
+  selectedOrigin: 0,
+  mintingTokenId: null,
+  activeNftModal: null,
+  notifications: JSON.parse(localStorage.getItem('om_notifs') || '[]'),
+  uploadedFile: null,
+  uploadedColFile: null,
+  currentPage: 'discover',
+  currentProfileTab: 'created',
+  countdownTimers: [],
+};
+
+// ── DEMO DATA (shown before contract is deployed) ──
+const DEMO_NFTS = [
+  { id:1, name:'Orca #001', collection:'Lightchain Originals', origin:0, price:'12.5', image:'', emoji:'🐋', creator:'0x1F89...15EB5' },
+  { id:2, name:'Neon Wave', collection:'Digital Dreams', origin:2, price:'8.0', image:'', emoji:'🌊', creator:'0xAbCd...1234' },
+  { id:3, name:'AIVM Vision', collection:'AIVM Art', origin:2, price:'25.0', image:'', emoji:'🤖', creator:'0xDeF0...5678' },
+  { id:4, name:'Lightchain Pulse', collection:'Lightchain Originals', origin:1, price:'5.5', image:'', emoji:'⚡', creator:'0x1F89...15EB5' },
+  { id:5, name:'Deep Sea #7', collection:'Ocean Series', origin:0, price:'3.2', image:'', emoji:'🌊', creator:'0x9876...4321' },
+  { id:6, name:'Genesis Block', collection:'', origin:0, price:'100.0', image:'', emoji:'🔷', creator:'0xAaaa...Bbbb' },
+];
+const DEMO_COLLECTIONS = [
+  { id:1, name:'Lightchain Originals', creator:'0x1F89...15EB5', items:12, floorPrice:'3.2', volume:'156.4', emoji:'🐋', desc:'The official OrcaMint genesis collection.' },
+  { id:2, name:'AIVM Art', creator:'0xAbCd...1234', items:30, floorPrice:'8.0', volume:'320.0', emoji:'🤖', desc:'AI-generated art powered by Lightchain AIVM.' },
+  { id:3, name:'Digital Dreams', creator:'0xDeF0...5678', items:8, floorPrice:'5.5', volume:'89.5', emoji:'🌊', desc:'Abstract digital paintings from the Lightchain community.' },
+];
+const DEMO_DROPS = [
+  { id:1, name:'Orca Genesis Drop', creator:'OrcaMint Team', launchAt: Date.now() + 2*60*60*1000, maxSupply:500, mintCount:127, mintPrice:'2', emoji:'🐋', live:false },
+  { id:2, name:'AIVM Pioneers', creator:'Lightchain Labs', launchAt: Date.now() - 60000, maxSupply:100, mintCount:83, mintPrice:'5', emoji:'🤖', live:true },
+  { id:3, name:'Neon Oceans', creator:'WaveArtist', launchAt: Date.now() + 24*60*60*1000, maxSupply:250, mintCount:0, mintPrice:'1.5', emoji:'🌊', live:false },
+];
+const DEMO_ACTIVITY = [
+  { event:'Mint', item:'Orca #001', price:'1', from:'0x1F89…', to:'0x1F89…', time: Date.now()-120000 },
+  { event:'Sale', item:'Neon Wave', price:'8.0', from:'0xAbCd…', to:'0xDeF0…', time: Date.now()-500000 },
+  { event:'Offer', item:'Genesis Block', price:'90.0', from:'0x9876…', to:'—', time: Date.now()-900000 },
+  { event:'Mint', item:'AIVM Vision', price:'1', from:'0xDeF0…', to:'0xDeF0…', time: Date.now()-1200000 },
+  { event:'List', item:'Lightchain Pulse', price:'5.5', from:'0x1F89…', to:'—', time: Date.now()-2000000 },
+];
+
+// ── HELPERS ──
+function shortAddr(addr) {
+  if (!addr || addr.length < 10) return addr || '—';
+  return addr.slice(0,6) + '…' + addr.slice(-4);
+}
+function formatLCAI(wei) {
+  if (!wei) return '0';
+  const n = Number(BigInt(wei)) / 1e18;
+  return n % 1 === 0 ? n.toString() : n.toFixed(3).replace(/\.?0+$/, '');
+}
+function timeAgo(ts) {
+  const s = Math.floor((Date.now()-ts)/1000);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+function originLabel(o) {
+  const labels = ['🎨 Artist Upload','⚡ AIVM Enhanced','🤖 AIVM Generated'];
+  const classes = ['origin-0','origin-1','origin-2'];
+  return `<span class="nft-origin ${classes[o]||'origin-0'}">${labels[o]||'Unknown'}</span>`;
+}
+function toast(msg, type='info', dur=3200) {
+  const z = document.getElementById('toastZone');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  z.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateY(16px)'; t.style.transition='.3s'; setTimeout(()=>t.remove(),300); }, dur);
+}
+function copyText(txt) {
+  navigator.clipboard.writeText(txt).catch(()=>{});
+  toast('Copied!','ok',1500);
+}
+
+// ── NAVIGATION ──
+function showPage(id) {
+  document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const sec = document.getElementById('sec-'+id);
+  if (sec) sec.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{ if(n.textContent.trim().toLowerCase().includes(id.substring(0,4))) n.classList.add('active'); });
+  S.currentPage = id;
+  if (id === 'discover') renderDiscover();
+  if (id === 'collections') renderCollections();
+  if (id === 'drops') renderDrops();
+  if (id === 'activity') renderActivity();
+  if (id === 'profile') renderProfile();
+  // Re-activate correct nav item
+  const navMap = { discover:0, collections:1, drops:2, activity:3, studio:4, profile:5, settings:6 };
+  document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.remove('active'));
+  const items = document.querySelectorAll('.nav-item');
+  const idx = ['discover','collections','drops','activity','studio','profile','settings'].indexOf(id);
+  if (idx >= 0 && items[idx]) items[idx].classList.add('active');
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ── WALLET ──
+async function connectWallet() {
+  if (!window.ethereum) {
+    toast('Please install Trust Wallet to continue', 'err', 4000);
+    return;
+  }
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    S.wallet = accounts[0];
+    const chainHex = await window.ethereum.request({ method: 'eth_chainId' });
+    const chainId = parseInt(chainHex, 16);
+    if (chainId !== CHAIN_ID) {
+      toast('Switching to Lightchain network…', 'info');
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x' + CHAIN_ID.toString(16) }]
+        });
+      } catch (e) {
+        if (e.code === 4902) {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: '0x' + CHAIN_ID.toString(16),
+              chainName: 'Lightchain AI',
+              nativeCurrency: { name: 'LCAI', symbol: 'LCAI', decimals: 18 },
+              rpcUrls: ['https://rpc.mainnet.lightchain.ai'],
+              blockExplorerUrls: ['https://explorer.lightchain.ai']
+            }]
+          });
+        }
+      }
+    }
+    onWalletConnected();
+  } catch(e) {
+    if (e.code !== 4001) toast('Connection failed: ' + (e.message||e), 'err');
+  }
+}
+
+function onWalletConnected() {
+  const addr = S.wallet;
+  document.getElementById('walletBtnIcon').textContent = '✅';
+  document.getElementById('walletBtnText').textContent = shortAddr(addr);
+  document.getElementById('walletAddr').textContent = shortAddr(addr);
+  document.getElementById('settingsWallet').textContent = addr;
+  document.getElementById('settingsNetwork').innerHTML = '<span style="color:var(--green)">✓ Lightchain</span>';
+  toast('Wallet connected: ' + shortAddr(addr), 'ok');
+  renderProfile();
+  loadContractData();
+}
+
+function disconnectWallet() {
+  S.wallet = null;
+  document.getElementById('walletBtnIcon').textContent = '🔗';
+  document.getElementById('walletBtnText').textContent = 'Connect Wallet';
+  document.getElementById('walletAddr').textContent = '';
+  document.getElementById('settingsWallet').textContent = '—';
+  document.getElementById('settingsNetwork').textContent = '—';
+  renderProfile();
+}
+
+window.addEventListener('load', ()=>{
+  if (window.ethereum && window.ethereum.selectedAddress) {
+    S.wallet = window.ethereum.selectedAddress;
+    onWalletConnected();
+  }
+  window.ethereum?.on('accountsChanged', accs => {
+    if (accs.length) { S.wallet = accs[0]; onWalletConnected(); }
+    else disconnectWallet();
+  });
+  initPage();
+});
+
+// ── INIT ──
+function initPage() {
+  renderDiscover();
+  renderNotifs();
+  updateFeePreview();
+  loadCollectionsForMintDropdown();
+  // Check live drops
+  if (DEMO_DROPS.some(d=>d.live)) {
+    document.getElementById('liveDropsBadge').style.display = 'inline';
+  }
+}
+
+async function loadContractData() {
+  if (CONTRACT_ADDR === 'DEPLOY_ME') {
+    document.getElementById('statNFTs').textContent = DEMO_NFTS.length + '+';
+    document.getElementById('statCols').textContent = DEMO_COLLECTIONS.length + '+';
+    return;
+  }
+  try {
+    // If ethers is loaded, use it; otherwise use raw eth_call
+    const nextTok = await ethCall('nextTokenId', []);
+    const nextCol = await ethCall('nextCollectionId', []);
+    const fee = await ethCall('mintFee', []);
+    document.getElementById('statNFTs').textContent = (parseInt(nextTok,16)-1).toString();
+    document.getElementById('statCols').textContent = (parseInt(nextCol,16)-1).toString();
+    S.mintFee = BigInt(nextTok); // placeholder
+    document.getElementById('settingsMintFee').textContent = formatLCAI(fee) + ' LCAI';
+    document.getElementById('fpMintFee').textContent = formatLCAI(fee) + ' LCAI';
+    document.getElementById('fpTotal').textContent = formatLCAI(fee) + ' LCAI';
+  } catch(e) { console.warn('Contract read failed:', e); }
+}
+
+// ── RAW ETH CALL ──
+async function ethCall(method, params) {
+  if (!window.ethereum) throw new Error('No wallet');
+  const sig = abiEncode(method, params);
+  const result = await window.ethereum.request({
+    method: 'eth_call',
+    params: [{ to: CONTRACT_ADDR, data: sig }, 'latest']
+  });
+  return result;
+}
+
+// ── ABI ENCODE (minimal for view calls with no params) ──
+function keccak4(name) {
+  // Use a hardcoded selector lookup for our functions
+  const selectors = {
+    'nextTokenId': '0x75794a3c',
+    'nextCollectionId': '0xf2fe3fd3',
+    'mintFee': '0x8b7afe2e',
+    'collectionFee': '0x6b8751c1',
+  };
+  return selectors[name] || '0x00000000';
+}
+function abiEncode(method, params) {
+  // Only handles zero-param view calls for now
+  return keccak4(method);
+}
+
+// ── SEND TRANSACTION ──
+async function sendTx(method, params, value) {
+  if (!S.wallet) { await connectWallet(); if (!S.wallet) return null; }
+  const selector = {
+    'mint': '0xd85d3d27',
+    'createCollection': '0x6d7a9c67',
+    'listForSale': '0x73e3c53b',
+    'buy': '0xa6f2ae3a',
+    'makeOffer': '0xef7c1e18',
+    'acceptOffer': '0x41637561',
+    'unlist': '0x7d3f4af5',
+    'approve': '0x095ea7b3',
+  };
+  // For the actual deployment we'll use window.ethereum.request eth_sendTransaction
+  // with properly encoded calldata. For now, show "coming soon" if not deployed.
+  if (CONTRACT_ADDR === 'DEPLOY_ME') {
+    toast('Contract not deployed yet — coming soon!', 'info', 3000);
+    return null;
+  }
+  toast('Opening Trust Wallet…', 'info');
+  // Full ABI encoding would go here via a minimal encoder
+  return null;
+}
+
+// ── RENDER DISCOVER ──
+function renderDiscover() {
+  renderNFTGrid('featuredGrid', DEMO_NFTS);
+  renderCollectionGrid('trendingCols', DEMO_COLLECTIONS);
+  renderDropsGrid('liveDropsGrid', DEMO_DROPS.filter(d=>d.live || (d.launchAt > Date.now() - 3600000)));
+}
+
+function renderNFTGrid(containerId, nfts) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!nfts.length) { el.innerHTML = '<div class="empty-state"><div class="big-icon">🖼️</div><h3>No NFTs yet</h3><p>Be the first to mint on Lightchain!</p><button class="btn btn-primary" onclick="showPage(\'studio\')">Mint Now</button></div>'; return; }
+  el.innerHTML = nfts.map(n => `
+    <div class="nft-card" onclick="openNftModal(${n.id})">
+      <div class="nft-img">${n.image ? `<img src="${n.image}" alt="${n.name}" loading="lazy">` : `<span style="font-size:3.5rem">${n.emoji||'🖼️'}</span>`}</div>
+      <span class="nft-like" onclick="event.stopPropagation();likeNFT(${n.id})">♡</span>
+      <div class="nft-info">
+        <div class="nft-name">${n.name}</div>
+        ${n.collection ? `<div class="nft-collection">${n.collection}</div>` : ''}
+        <div class="nft-footer">
+          <div class="nft-price"><strong>${n.price} LCAI</strong></div>
+          ${originLabel(n.origin)}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderCollectionGrid(containerId, cols) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!cols.length) { el.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="big-icon">🗂️</div><h3>No collections yet</h3><button class="btn btn-primary" onclick="showPage(\'studio\')">Create Collection</button></div>'; return; }
+  el.innerHTML = cols.map(c => `
+    <div class="col-card" onclick="openCollection(${c.id})">
+      <div class="col-banner" style="background:linear-gradient(135deg,#1a0a3a,#0a2030)">
+        <span style="font-size:3rem;opacity:.4">${c.emoji||'🗂️'}</span>
+        <div class="col-avatar">${c.emoji||'🗂️'}</div>
+      </div>
+      <div class="col-body">
+        <div class="col-name">${c.name}</div>
+        <div class="col-by">by ${shortAddr(c.creator)}</div>
+        <div class="col-stats">
+          <div class="col-stat"><div class="v">${c.items}</div><div class="l">Items</div></div>
+          <div class="col-stat"><div class="v">${c.floorPrice}</div><div class="l">Floor LCAI</div></div>
+          <div class="col-stat"><div class="v">${c.volume}</div><div class="l">Volume</div></div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderDropsGrid(containerId, drops) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!drops.length) { el.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="big-icon">🚀</div><h3>No drops scheduled</h3><p>Check back soon!</p></div>'; return; }
+  el.innerHTML = drops.map(d => {
+    const isLive = d.live || d.launchAt <= Date.now();
+    const isEnded = d.mintCount >= d.maxSupply && d.maxSupply > 0;
+    const pct = d.maxSupply > 0 ? Math.round(d.mintCount/d.maxSupply*100) : 0;
+    const status = isEnded ? 'ended' : isLive ? 'live' : 'soon';
+    const statusLabel = isEnded ? 'Sold Out' : isLive ? 'LIVE' : 'Upcoming';
+    return `
+    <div class="drop-card">
+      <div class="drop-banner">
+        <span style="font-size:4rem">${d.emoji||'🚀'}</span>
+        <div class="drop-status drop-${status}">${statusLabel}</div>
+      </div>
+      <div class="drop-body">
+        <div class="drop-name">${d.name}</div>
+        <div class="drop-by">by ${d.creator}</div>
+        ${!isLive && !isEnded ? `<div class="drop-countdown" id="cd-${d.id}">${countdownHtml(d.launchAt)}</div>` : ''}
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="drop-info">
+          <span>${d.mintCount} / ${d.maxSupply > 0 ? d.maxSupply : '∞'} minted</span>
+          <span>Price: <strong>${d.mintPrice} LCAI</strong></span>
+        </div>
+        ${isLive && !isEnded ? `<button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px;" onclick="mintFromDrop(${d.id})">Mint Now</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  startCountdownTimers();
+}
+
+function countdownHtml(ts) {
+  const diff = Math.max(0, ts - Date.now());
+  const days  = Math.floor(diff / 86400000);
+  const hrs   = Math.floor((diff % 86400000) / 3600000);
+  const mins  = Math.floor((diff % 3600000) / 60000);
+  const secs  = Math.floor((diff % 60000) / 1000);
+  return `<div class="countdown-unit"><div class="n">${String(days).padStart(2,'0')}</div><div class="u">Days</div></div>
+          <div class="countdown-unit"><div class="n">${String(hrs).padStart(2,'0')}</div><div class="u">Hours</div></div>
+          <div class="countdown-unit"><div class="n">${String(mins).padStart(2,'0')}</div><div class="u">Mins</div></div>
+          <div class="countdown-unit"><div class="n">${String(secs).padStart(2,'0')}</div><div class="u">Secs</div></div>`;
+}
+
+function startCountdownTimers() {
+  S.countdownTimers.forEach(clearInterval);
+  S.countdownTimers = [];
+  DEMO_DROPS.forEach(d => {
+    if (d.launchAt > Date.now()) {
+      const t = setInterval(()=>{
+        const el = document.getElementById('cd-' + d.id);
+        if (el) el.innerHTML = countdownHtml(d.launchAt);
+        else clearInterval(t);
+      }, 1000);
+      S.countdownTimers.push(t);
+    }
+  });
+}
+
+function renderCollections() {
+  renderCollectionGrid('allColsGrid', DEMO_COLLECTIONS);
+}
+
+function renderDrops() {
+  renderDropsGrid('allDropsGrid', DEMO_DROPS);
+}
+
+function renderActivity() {
+  const tbody = document.getElementById('activityBody');
+  if (!tbody) return;
+  const evClass = { Mint:'ev-mint', Sale:'ev-sale', List:'ev-list', Offer:'ev-offer' };
+  tbody.innerHTML = DEMO_ACTIVITY.map(a => `
+    <tr>
+      <td><span class="event-badge ${evClass[a.event]||''}">${a.event}</span></td>
+      <td><strong>${a.item}</strong></td>
+      <td>${a.price} LCAI</td>
+      <td class="addr-short">${a.from}</td>
+      <td class="addr-short">${a.to}</td>
+      <td class="text-muted">${timeAgo(a.time)}</td>
+    </tr>`).join('');
+}
+
+// ── PROFILE ──
+function renderProfile() {
+  const name = document.getElementById('profileName');
+  const addrEl = document.getElementById('profileAddrEl');
+  const avatar = document.getElementById('profileAvatar');
+  const shareBtn = document.getElementById('shareProfileBtn');
+  if (!S.wallet) {
+    name.textContent = 'Connect wallet to view profile';
+    addrEl.textContent = '—';
+    document.getElementById('profileContent').innerHTML = `
+      <div class="empty-state">
+        <div class="big-icon">🔗</div>
+        <h3>Connect your wallet</h3>
+        <p>Connect your Trust Wallet to see your NFTs and activity</p>
+        <button class="btn btn-primary" onclick="connectWallet()">Connect Wallet</button>
+      </div>`;
+    shareBtn.style.display = 'none';
+    return;
+  }
+  name.textContent = 'Wallet ' + shortAddr(S.wallet);
+  addrEl.textContent = S.wallet;
+  shareBtn.style.display = '';
+  // Color avatar from wallet
+  const hue = parseInt(S.wallet.slice(2,6),16) % 360;
+  avatar.style.background = `hsl(${hue},60%,25%)`;
+  avatar.textContent = S.wallet.slice(2,4).toUpperCase();
+  showProfileTab(S.currentProfileTab);
+}
+
+function showProfileTab(tab) {
+  S.currentProfileTab = tab;
+  document.querySelectorAll('.profile-tab').forEach((t,i)=>{
+    const tabs = ['created','collected','listings','activity'];
+    t.classList.toggle('active', tabs[i]===tab);
+  });
+  const content = document.getElementById('profileContent');
+  const myNFTs = DEMO_NFTS.filter(n => S.wallet && n.creator === shortAddr(S.wallet));
+  if (tab === 'created') {
+    if (!myNFTs.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🎨</div><h3>No NFTs minted yet</h3><p>Head to Studio to mint your first NFT on Lightchain</p><button class="btn btn-primary" onclick="showPage('studio')">Go to Studio</button></div>`;
+    else { content.innerHTML = '<div class="nft-grid" id="profileNftGrid" style="padding:0"></div>'; renderNFTGrid('profileNftGrid', myNFTs); }
+  } else if (tab === 'collected') {
+    content.innerHTML = `<div class="empty-state"><div class="big-icon">🛍️</div><h3>No collected NFTs</h3><p>Browse the marketplace and buy your first NFT</p><button class="btn btn-primary" onclick="showPage('discover')">Browse Marketplace</button></div>`;
+  } else if (tab === 'listings') {
+    content.innerHTML = `<div class="empty-state"><div class="big-icon">🏷️</div><h3>No active listings</h3><p>List your NFTs for sale from their detail page</p></div>`;
+  } else if (tab === 'activity') {
+    content.innerHTML = `<div style="overflow-x:auto"><table class="activity-table"><thead><tr><th>Event</th><th>Item</th><th>Price</th><th>Time</th></tr></thead><tbody>${DEMO_ACTIVITY.slice(0,3).map(a=>`<tr><td><span class="event-badge ${a.event==='Mint'?'ev-mint':'ev-sale'}">${a.event}</span></td><td>${a.item}</td><td>${a.price} LCAI</td><td class="text-muted">${timeAgo(a.time)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+}
+
+function copyAddr() { if(S.wallet) copyText(S.wallet); }
+function shareProfile() { copyText(location.href + '?profile=' + S.wallet); toast('Profile link copied!','ok'); }
+
+// ── NFT DETAIL MODAL ──
+function openNftModal(id) {
+  const nft = DEMO_NFTS.find(n=>n.id===id);
+  if (!nft) return;
+  S.activeNftModal = nft;
+  const imgEl = document.getElementById('nftModalImg');
+  imgEl.innerHTML = nft.image ? `<img src="${nft.image}" alt="${nft.name}">` : `<span style="font-size:6rem">${nft.emoji||'🖼️'}</span>`;
+  document.getElementById('nftModalInfo').innerHTML = `
+    <div class="nft-detail-collection" onclick="openCollection(1)">${nft.collection||'Standalone NFT'}</div>
+    <div class="nft-detail-name">${nft.name}</div>
+    <div class="nft-detail-origin">${originLabel(nft.origin)}</div>
+    <div class="owner-row"><div class="owner-avatar">${nft.creator.slice(2,4)}</div><span>Owned by</span><strong>${nft.creator}</strong></div>
+    <div class="price-box">
+      <div class="lbl">Current price</div>
+      <div class="price">${nft.price} <span>LCAI</span></div>
+    </div>
+    <div class="detail-actions">
+      <button class="btn btn-primary" onclick="buyNFT(${nft.id})">Buy Now</button>
+      <button class="btn btn-outline" onclick="openOfferModal(${nft.id})">Make Offer</button>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Description</div>
+      <p style="font-size:.88rem;color:var(--text2);line-height:1.6;">${nft.name} — a unique piece on Lightchain. ${nft.origin===2?'Generated entirely by Lightchain AIVM.':nft.origin===1?'Enhanced by Lightchain AIVM.':'Original artwork by the creator.'}</p>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Details</div>
+      <div class="fee-row"><span class="lbl">Token ID</span><span class="val">#${nft.id}</span></div>
+      <div class="fee-row"><span class="lbl">Creator</span><span class="val addr-short">${nft.creator}</span></div>
+      <div class="fee-row"><span class="lbl">Royalty</span><span class="val">5%</span></div>
+      <div class="fee-row"><span class="lbl">Chain</span><span class="val">Lightchain (9200)</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">AIVM Analysis <span class="aivm-btn" style="cursor:pointer" onclick="aivmAnalyzeNFT(${nft.id})">⚡ Analyze</span></div>
+      <div id="nftAivmAnalysis" style="font-size:.84rem;color:var(--text2);line-height:1.6;min-height:40px;"></div>
+    </div>`;
+  document.getElementById('nftModal').classList.add('open');
+}
+
+function closeNftModal() {
+  document.getElementById('nftModal').classList.remove('open');
+  S.activeNftModal = null;
+}
+
+function openCollection(id) {
+  // Future: navigate to collection page
+  toast('Collection view coming soon!', 'info');
+}
+
+// ── BUY / OFFER ──
+async function buyNFT(id) {
+  const nft = DEMO_NFTS.find(n=>n.id===id);
+  if (!nft) return;
+  if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
+  await sendTx('buy', [id], nft.price);
+}
+
+function openOfferModal(id) {
+  const exp = new Date(Date.now() + 7*86400000);
+  document.getElementById('offerExpiry').value = exp.toISOString().slice(0,16);
+  document.getElementById('offerModal').classList.add('open');
+  document.getElementById('offerModal').dataset.tokenId = id;
+}
+
+async function submitOffer() {
+  const id = document.getElementById('offerModal').dataset.tokenId;
+  const amount = document.getElementById('offerAmount').value;
+  const expiry = document.getElementById('offerExpiry').value;
+  if (!amount || !expiry) { toast('Fill all fields', 'err'); return; }
+  if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
+  await sendTx('makeOffer', [id, Math.floor(new Date(expiry).getTime()/1000)], amount);
+  document.getElementById('offerModal').classList.remove('open');
+}
+
+function openListModal(id) {
+  document.getElementById('listModal').classList.add('open');
+  document.getElementById('listModal').dataset.tokenId = id;
+  document.getElementById('listPrice').oninput = updateListPreview;
+}
+
+function updateListPreview() {
+  const price = parseFloat(document.getElementById('listPrice').value) || 0;
+  const platform = price * 0.025;
+  const royalty = price * 0.05; // assume 5%
+  const seller = price - platform - royalty;
+  document.getElementById('listFeePreview').textContent = platform.toFixed(3) + ' LCAI';
+  document.getElementById('listRoyaltyPreview').textContent = royalty.toFixed(3) + ' LCAI';
+  document.getElementById('listSellerPreview').textContent = seller.toFixed(3) + ' LCAI';
+}
+
+async function submitListing() {
+  const id = document.getElementById('listModal').dataset.tokenId;
+  const price = document.getElementById('listPrice').value;
+  if (!price || price <= 0) { toast('Enter a valid price', 'err'); return; }
+  if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
+  await sendTx('listForSale', [id, Math.round(parseFloat(price)*1e18).toString()], '0');
+  document.getElementById('listModal').classList.remove('open');
+}
+
+// ── MINT ──
+function selectOrigin(o) {
+  S.selectedOrigin = o;
+  [0,1,2].forEach(i => document.getElementById('ori-'+i)?.classList.toggle('selected', i===o));
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) previewFile(file, 'uploadPreview', 'uploadZone');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  handleDragLeave(e);
+  const file = e.dataTransfer.files[0];
+  if (file) previewFile(file, 'uploadPreview', 'uploadZone');
+}
+function handleDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag'); }
+function handleDragLeave(e) { document.getElementById('uploadZone').classList.remove('drag'); }
+
+function previewFile(file, previewId, zoneId) {
+  if (file.size > 50*1024*1024) { toast('File too large (max 50MB)', 'err'); return; }
+  S.uploadedFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const prev = document.getElementById(previewId);
+    prev.src = ev.target.result;
+    prev.style.display = 'block';
+    document.getElementById(zoneId).style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleColImageSelect(e) {
+  const file = e.target.files[0];
+  if (file) { S.uploadedColFile = file; previewFile(file, 'colPreview', 'colUploadZone'); }
+}
+
+function updateFeePreview() {
+  const royalty = parseFloat(document.getElementById('mintRoyalty')?.value || 5);
+  document.getElementById('fpRoyalty').textContent = royalty + '% (on resales)';
+  document.getElementById('fpMintFee').textContent = formatLCAI(S.mintFee.toString()) + ' LCAI';
+  document.getElementById('fpTotal').textContent = formatLCAI(S.mintFee.toString()) + ' LCAI';
+}
+
+function setStudioTab(tab) {
+  document.getElementById('tab-mint').classList.toggle('active', tab==='mint');
+  document.getElementById('tab-collection').classList.toggle('active', tab==='collection');
+  document.getElementById('studio-mint').style.display = tab==='mint' ? '' : 'none';
+  document.getElementById('studio-collection').style.display = tab==='collection' ? '' : 'none';
+}
+
+function loadCollectionsForMintDropdown() {
+  const sel = document.getElementById('mintCollection');
+  if (!sel) return;
+  DEMO_COLLECTIONS.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function uploadToR2(file) {
+  // Placeholder — real implementation sends to Cloudflare R2 Worker
+  // Returns a permanent URL
+  toast('R2 upload endpoint not configured yet — using placeholder URI', 'info', 3000);
+  return R2_BASE_URL + '/placeholder/' + Date.now() + '.png';
+}
+
+async function mintNFT() {
+  if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
+  const name = document.getElementById('mintName').value.trim();
+  const desc = document.getElementById('mintDesc').value.trim();
+  const tags = document.getElementById('mintTags').value.trim();
+  const royaltyPct = parseFloat(document.getElementById('mintRoyalty').value) || 0;
+  const collectionId = parseInt(document.getElementById('mintCollection').value) || 0;
+  const toAddr = document.getElementById('mintTo').value.trim() || S.wallet;
+  if (!name) { toast('Give your NFT a name', 'err'); return; }
+  if (!S.uploadedFile) { toast('Upload artwork first', 'err'); return; }
+  if (royaltyPct > 20) { toast('Royalty max 20%', 'err'); return; }
+
+  const btn = document.querySelector('#studio-mint .btn-primary');
+  btn.disabled = true;
+  btn.textContent = '⏳ Uploading image…';
+
+  try {
+    const imageURI = await uploadToR2(S.uploadedFile);
+    const metadata = {
+      name, description: desc,
+      image: imageURI,
+      attributes: tags.split(',').filter(Boolean).map(t=>({ trait_type:'Tag', value:t.trim() })),
+      origin: S.selectedOrigin
+    };
+    // In production, upload JSON to R2 too
+    const tokenURI = 'data:application/json;base64,' + btoa(JSON.stringify(metadata));
+    const royaltyBps = Math.round(royaltyPct * 100);
+
+    btn.textContent = '⏳ Minting on Lightchain…';
+    const result = await sendTx('mint', [toAddr, tokenURI, royaltyBps, collectionId, S.selectedOrigin], formatLCAI(S.mintFee.toString()));
+    if (result !== null) {
+      toast('🎉 NFT minted successfully!', 'ok', 5000);
+      addNotification('✨', 'NFT Minted!', `"${name}" was successfully minted on Lightchain.`);
+      resetMintForm();
+    }
+  } catch(e) {
+    toast('Mint failed: ' + (e.message||e), 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ Mint NFT on Lightchain';
+  }
+}
+
+function resetMintForm() {
+  document.getElementById('mintName').value = '';
+  document.getElementById('mintDesc').value = '';
+  document.getElementById('mintTags').value = '';
+  document.getElementById('mintRoyalty').value = '5';
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadZone').style.display = '';
+  S.uploadedFile = null;
+  selectOrigin(0);
+}
+
+async function createCollection() {
+  if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
+  const name = document.getElementById('colName').value.trim();
+  const desc = document.getElementById('colDesc').value.trim();
+  const maxSupply = parseInt(document.getElementById('colMaxSupply').value) || 0;
+  const mintPrice = parseFloat(document.getElementById('colMintPrice').value) || 0;
+  const launchAt = document.getElementById('colLaunchAt').value;
+  const launchTs = launchAt ? Math.floor(new Date(launchAt).getTime()/1000) : 0;
+  if (!name) { toast('Give the collection a name', 'err'); return; }
+  let imageURI = '';
+  if (S.uploadedColFile) imageURI = await uploadToR2(S.uploadedColFile);
+  const mintPriceWei = mintPrice > 0 ? Math.round(mintPrice*1e18).toString() : '0';
+  await sendTx('createCollection', [name, desc, imageURI, maxSupply, mintPriceWei, launchTs], '5');
+  if (CONTRACT_ADDR === 'DEPLOY_ME') return;
+  toast('Collection deployed!', 'ok', 5000);
+  addNotification('🗂️', 'Collection Created', `"${name}" is live on Lightchain.`);
+}
+
+function mintFromDrop(dropId) {
+  showPage('studio');
+  toast('Select the collection in Studio to mint into this drop', 'info', 4000);
+}
+
+// ── AIVM ──
+async function aivmCall(prompt) {
+  const res = await fetch(AIVM_GATEWAY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'lightchain-aivm', messages: [{ role:'user', content: prompt }], max_tokens: 200 })
+  });
+  if (!res.ok) throw new Error('AIVM error ' + res.status);
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || data.content || data.result || '';
+}
+
+async function aivmGenerateDesc() {
+  const name = document.getElementById('mintName').value || 'this NFT';
+  const btn = document.getElementById('aivmDescBtn');
+  btn.disabled = true; btn.textContent = '⚡ Generating…';
+  try {
+    const text = await aivmCall(`Write a compelling 2-sentence description for an NFT called "${name}". Be creative and highlight uniqueness. No hashtags.`);
+    document.getElementById('mintDesc').value = text.trim();
+  } catch(e) { toast('AIVM unavailable — try again', 'err'); }
+  finally { btn.disabled = false; btn.textContent = '⚡ Generate with AIVM'; }
+}
+
+async function aivmGenerateTags() {
+  const name = document.getElementById('mintName').value || 'digital art';
+  const btn = document.getElementById('aivmTagBtn');
+  btn.disabled = true; btn.textContent = '⚡ Thinking…';
+  try {
+    const text = await aivmCall(`Suggest 6 relevant comma-separated tags for an NFT called "${name}". Return only the tags, no explanation.`);
+    document.getElementById('mintTags').value = text.replace(/['"]/g,'').trim();
+  } catch(e) { toast('AIVM unavailable — try again', 'err'); }
+  finally { btn.disabled = false; btn.textContent = '⚡ Suggest Tags'; }
+}
+
+async function aivmGenerateColDesc() {
+  const name = document.getElementById('colName').value || 'this collection';
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⚡ Generating…';
+  try {
+    const text = await aivmCall(`Write a 2-sentence description for an NFT collection called "${name}" on the Lightchain blockchain. Be evocative and community-focused.`);
+    document.getElementById('colDesc').value = text.trim();
+  } catch(e) { toast('AIVM unavailable', 'err'); }
+  finally { btn.disabled = false; btn.textContent = '⚡ Generate with AIVM'; }
+}
+
+async function aivmAnalyzeNFT(id) {
+  const nft = DEMO_NFTS.find(n=>n.id===id);
+  if (!nft) return;
+  const el = document.getElementById('nftAivmAnalysis');
+  el.innerHTML = '<span class="loading-spinner"></span> Analyzing with AIVM…';
+  try {
+    const text = await aivmCall(`Briefly analyze the NFT "${nft.name}" (${['artist-uploaded','AIVM-enhanced','AIVM-generated'][nft.origin]} art). Comment on its potential value and uniqueness in 2 sentences.`);
+    el.textContent = text.trim();
+  } catch(e) { el.textContent = 'AIVM analysis unavailable right now.'; }
+}
+
+// ── SUPPORT CHAT ──
+function toggleSupport() {
+  document.getElementById('supportPanel').classList.toggle('open');
+}
+
+function supportQuestion(q) {
+  document.getElementById('supportInput').value = q;
+  sendSupport();
+}
+
+async function sendSupport() {
+  const input = document.getElementById('supportInput');
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  const msgs = document.getElementById('supportMsgs');
+  msgs.innerHTML += `<div class="support-msg user">${q}</div>`;
+  msgs.innerHTML += `<div class="support-msg bot" id="supportTyping">⟳ Thinking…</div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+  try {
+    const ans = await aivmCall(`You are a helpful assistant for OrcaMint, the first NFT platform on Lightchain. Answer this question concisely: ${q}`);
+    document.getElementById('supportTyping').textContent = ans.trim();
+  } catch(e) {
+    document.getElementById('supportTyping').textContent = 'AIVM is busy right now. For help, check our FAQ or try again.';
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── NOTIFICATIONS ──
+function addNotification(icon, title, body) {
+  S.notifications.unshift({ icon, title, body, time: Date.now(), read: false });
+  localStorage.setItem('om_notifs', JSON.stringify(S.notifications.slice(0,50)));
+  renderNotifs();
+  document.getElementById('notifDot').style.display = '';
+}
+
+function renderNotifs() {
+  const list = document.getElementById('notifList');
+  if (!list) return;
+  if (!S.notifications.length) {
+    list.innerHTML = '<div class="notif-empty">🔔<br>No notifications yet</div>';
+    return;
+  }
+  list.innerHTML = S.notifications.map(n => `
+    <div class="notif-item ${n.read?'':'unread'}">
+      <div class="notif-icon">${n.icon}</div>
+      <div class="notif-body"><p><strong>${n.title}</strong> ${n.body}</p><time>${timeAgo(n.time)}</time></div>
+    </div>`).join('');
+  const unread = S.notifications.filter(n=>!n.read).length;
+  document.getElementById('notifDot').style.display = unread ? '' : 'none';
+}
+
+function toggleNotifs() {
+  const panel = document.getElementById('notifPanel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    S.notifications.forEach(n=>n.read=true);
+    localStorage.setItem('om_notifs', JSON.stringify(S.notifications));
+    document.getElementById('notifDot').style.display = 'none';
+  }
+}
+
+function clearNotifs() {
+  S.notifications = [];
+  localStorage.setItem('om_notifs','[]');
+  renderNotifs();
+}
+
+// ── SEARCH ──
+function handleSearch(e) {
+  const q = e.target.value.toLowerCase().trim();
+  if (!q) return;
+  if (e.key === 'Enter') {
+    const match = DEMO_NFTS.filter(n=>n.name.toLowerCase().includes(q)||n.collection?.toLowerCase().includes(q));
+    if (match.length) {
+      showPage('discover');
+      renderNFTGrid('featuredGrid', match);
+      toast(`Found ${match.length} result(s) for "${q}"`, 'info');
+    } else {
+      toast(`No results for "${q}"`, 'info');
+    }
+  }
+}
+
+// ── LIKES ──
+function likeNFT(id) {
+  const likes = JSON.parse(localStorage.getItem('om_likes')||'[]');
+  const idx = likes.indexOf(id);
+  if (idx >= 0) likes.splice(idx,1);
+  else { likes.push(id); toast('Added to favorites ♡', 'ok', 2000); }
+  localStorage.setItem('om_likes', JSON.stringify(likes));
+}
+
+// ── CLOSE MODALS ON OVERLAY CLICK ──
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('open'); });
+});
+
+// ── MOBILE ──
+if (window.innerWidth <= 768) {
+  document.getElementById('mobileMenuBtn').style.display = '';
+}
+</script>
+</body>
+</html>
