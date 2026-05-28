@@ -25,8 +25,7 @@
   --radius-sm: 8px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { overflow-x: hidden; max-width: 100vw; }
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; overflow-x: hidden; max-width: 100vw; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; overflow-x: hidden; }
 
 /* ── SIDEBAR ── */
 #sidebar {
@@ -63,7 +62,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 #walletAddr { font-size: .72rem; color: var(--text3); text-align: center; margin-top: 6px; word-break: break-all; }
 
 /* ── MAIN ── */
-#main { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+#main { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; display: flex; flex-direction: column; min-width: 0; }
+#page { min-width: 0; overflow-x: hidden; }
 
 /* ── TOPBAR ── */
 #topbar {
@@ -393,7 +393,9 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   /* ── Topbar ── */
   #topbar { padding: 0 10px; gap: 6px; height: 54px; }
   #searchBox { max-width: none; min-width: 0; flex: 1; font-size: .82rem; padding: 7px 10px 7px 28px; }
-  #mobileWalletBtn { display: flex !important; flex-shrink: 0; }
+  .topbar-actions { flex-shrink: 0; gap: 6px; }
+  #mobileWalletBtn { display: flex !important; flex-shrink: 0; width: 36px; height: 36px; padding: 0; border-radius: 50%; justify-content: center; align-items: center; }
+  #mobileWalletBtnText { font-size: 1rem; line-height: 1; }
 
   /* ── Hero ── */
   .hero { padding: 22px 16px 16px; height: auto; min-height: auto; flex-direction: column; align-items: flex-start; overflow: hidden; box-sizing: border-box; }
@@ -509,8 +511,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
         <span class="notif-dot" id="notifDot" style="display:none"></span>
       </div>
       <div class="icon-btn" onclick="showPage('studio')" title="Mint NFT">✨</div>
-      <button id="mobileWalletBtn" onclick="connectWallet()" style="display:none;align-items:center;gap:5px;padding:0 10px;height:34px;border-radius:18px;background:linear-gradient(135deg,var(--cyan),var(--purple));border:none;color:#000;font-weight:700;font-size:.75rem;cursor:pointer;white-space:nowrap;">
-        <span id="mobileWalletBtnText">🔗 Connect</span>
+      <button id="mobileWalletBtn" onclick="connectWallet()" title="Connect Wallet" style="display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--purple));border:none;color:#000;font-size:1rem;cursor:pointer;flex-shrink:0;">
+        <span id="mobileWalletBtnText">🔗</span>
       </button>
       <div class="icon-btn" id="mobileMenuBtn" onclick="toggleSidebar()" style="display:none">☰</div>
     </div>
@@ -1139,7 +1141,7 @@ function onWalletConnected() {
   document.getElementById('walletBtnText').textContent = shortAddr(addr);
   document.getElementById('walletAddr').textContent = shortAddr(addr);
   const mwb = document.getElementById('mobileWalletBtnText');
-  if (mwb) mwb.textContent = '✅ ' + shortAddr(addr);
+  if (mwb) mwb.textContent = '✅';
   document.getElementById('settingsWallet').textContent = addr;
   document.getElementById('settingsNetwork').innerHTML = '<span style="color:var(--green)">✓ Lightchain</span>';
   toast('Wallet connected: ' + shortAddr(addr), 'ok');
@@ -1153,7 +1155,7 @@ function disconnectWallet() {
   document.getElementById('walletBtnText').textContent = 'Connect Wallet';
   document.getElementById('walletAddr').textContent = '';
   const mwb = document.getElementById('mobileWalletBtnText');
-  if (mwb) mwb.textContent = '🔗 Connect';
+  if (mwb) mwb.textContent = '🔗';
   document.getElementById('settingsWallet').textContent = '—';
   document.getElementById('settingsNetwork').textContent = '—';
   renderProfile();
