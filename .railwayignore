@@ -1,0 +1,8 @@
+# Only deploy OrcaMint files
+*
+!orcamint-server.py
+!index.html
+!orcamint-logo.png
+!orcamint-icon.png
+!Procfile
+!requirements.txt
