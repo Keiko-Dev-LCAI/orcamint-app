@@ -602,7 +602,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           <div class="upload-zone" id="uploadZone" onclick="document.getElementById('artFile').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
             <div class="upload-icon">🖼️</div>
             <p>Drop your artwork here or <strong style="color:var(--cyan)">click to browse</strong></p>
-            <div class="upload-hint">PNG, JPG, GIF, MP4 · Max 50MB · Stored on Cloudflare R2</div>
+            <div class="upload-hint">PNG, JPG, GIF, MP4 · Stored permanently on Lightchain — no external service</div>
           </div>
           <img id="uploadPreview" class="upload-preview">
           <input type="file" id="artFile" accept="image/*,video/mp4" style="display:none" onchange="handleFileSelect(event)">
@@ -817,10 +817,10 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 
         <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px;">
           <div style="font-weight:700;margin-bottom:14px;">About</div>
-          <p style="font-size:.85rem;color:var(--text2);line-height:1.6;">OrcaMint is the first NFT minting platform on Lightchain. Upload your art, mint it on-chain with ERC-721 + ERC-2981 royalties, and trade in the built-in marketplace. Powered by Lightchain AIVM for AI-assisted metadata.</p>
+          <p style="font-size:.85rem;color:var(--text2);line-height:1.6;">OrcaMint is the first <strong style="color:var(--cyan)">truly on-chain</strong> NFT platform on Lightchain. Your artwork is stored <strong style="color:var(--cyan)">directly on the blockchain</strong> — no IPFS, no cloud storage, no servers that can disappear. Every other NFT platform gives you a receipt pointing to a server. OrcaMint puts the actual art on-chain, permanently. Mint with ERC-721 + ERC-2981 royalties. Powered by Lightchain AIVM.</p>
           <div style="margin-top:12px;font-size:.78rem;color:var(--text3);">
             Privacy-first · No email required · Wallet = your identity<br>
-            Image storage: Cloudflare R2 · AI: Lightchain AIVM
+            Image stored permanently on Lightchain · AI: Lightchain AIVM
           </div>
         </div>
       </div>
@@ -937,8 +937,7 @@ const CHAIN_ID       = 9200;
 const CONTRACT_ADDR  = '0xe7bD4500277f6167B6b454CF2CF529c062B4Ca1a';
 const PLATFORM_WALLET= '0x1F899FaD2C8BD70b6eF356ae6cC3c0abDbB15EB5';
 const AIVM_GATEWAY   = 'https://web-production-0ccfe.up.railway.app/api/aivm';
-const R2_UPLOAD_URL  = 'https://upload.orcamint.xyz';
-const R2_BASE_URL    = 'https://pub-c68ca061684f40fa8d7a11b3176f9c44.r2.dev';
+// Images stored directly on Lightchain — no external service needed
 
 // ── CONTRACT ABI ──
 const ABI = [
@@ -1611,11 +1610,41 @@ function loadCollectionsForMintDropdown() {
   });
 }
 
-async function uploadToR2(file) {
-  // Placeholder — real implementation sends to Cloudflare R2 Worker
-  // Returns a permanent URL
-  toast('R2 upload endpoint not configured yet — using placeholder URI', 'info', 3000);
-  return R2_BASE_URL + '/placeholder/' + Date.now() + '.png';
+async function encodeImageForChain(file) {
+  // Compress and encode image as base64 data URI for permanent on-chain storage
+  return new Promise((resolve, reject) => {
+    if (file.type.startsWith('video/')) {
+      // Videos: read as base64 directly (user is responsible for size)
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1024;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const quality  = file.type === 'image/png' ? undefined : 0.85;
+      const dataURI  = canvas.toDataURL(mimeType, quality);
+      const kb = Math.round(dataURI.length * 0.75 / 1024);
+      console.log(`On-chain image: ${w}x${h} ${mimeType} ~${kb}KB`);
+      resolve(dataURI);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
 }
 
 async function mintNFT() {
@@ -1632,17 +1661,17 @@ async function mintNFT() {
 
   const btn = document.querySelector('#studio-mint .btn-primary');
   btn.disabled = true;
-  btn.textContent = '⏳ Uploading image…';
+  btn.textContent = '⏳ Encoding image for Lightchain…';
 
   try {
-    const imageURI = await uploadToR2(S.uploadedFile);
+    const imageURI = await encodeImageForChain(S.uploadedFile);
     const metadata = {
       name, description: desc,
       image: imageURI,
       attributes: tags.split(',').filter(Boolean).map(t=>({ trait_type:'Tag', value:t.trim() })),
       origin: S.selectedOrigin
     };
-    // In production, upload JSON to R2 too
+    // Full metadata + image stored permanently on Lightchain — no external service
     const tokenURI = 'data:application/json;base64,' + btoa(JSON.stringify(metadata));
     const royaltyBps = Math.round(royaltyPct * 100);
 
@@ -1682,7 +1711,7 @@ async function createCollection() {
   const launchTs = launchAt ? Math.floor(new Date(launchAt).getTime()/1000) : 0;
   if (!name) { toast('Give the collection a name', 'err'); return; }
   let imageURI = '';
-  if (S.uploadedColFile) imageURI = await uploadToR2(S.uploadedColFile);
+  if (S.uploadedColFile) imageURI = await encodeImageForChain(S.uploadedColFile);
   const mintPriceWei = mintPrice > 0 ? Math.round(mintPrice*1e18).toString() : '0';
   await fetchLcaiPrice();
   const colFeeEth = usdToLcaiStr(COLLECTION_FEE_USD);
@@ -1996,7 +2025,7 @@ initMobile();
       <div style="height:1px;background:rgba(255,255,255,0.07);"></div>
 
       <div><div style="font-size:13px;font-weight:700;color:#e0eaf5;margin-bottom:5px;">5. No Warranty — Service Provided AS-IS</div>
-      <p>THIS SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE OPERATOR DOES NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR FREE FROM SECURITY VULNERABILITIES. NFT METADATA AND MEDIA ARE STORED EXTERNALLY AND THE OPERATOR CANNOT GUARANTEE THEIR PERMANENT AVAILABILITY.</p></div>
+      <p>THIS SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE OPERATOR DOES NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR FREE FROM SECURITY VULNERABILITIES. NFT METADATA AND MEDIA ARE STORED PERMANENTLY ON THE LIGHTCHAIN BLOCKCHAIN AS PART OF THE TOKEN URI.</p></div>
       <div style="height:1px;background:rgba(255,255,255,0.07);"></div>
 
       <div><div style="font-size:13px;font-weight:700;color:#e0eaf5;margin-bottom:5px;">6. Limitation of Liability</div>
