@@ -491,6 +491,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
     </div>
   </div>
 
+  <div class="nav-section" id="adminNavSection" style="display:none">
+    <div class="nav-label">Admin</div>
+    <div class="nav-item" id="nav-moderation" onclick="showPage('moderation')">
+      <span class="nav-icon">🛡️</span> Moderation
+      <span class="nav-badge red" id="modBadge" style="display:none">0</span>
+    </div>
+  </div>
+
   <div class="nav-section">
     <div class="nav-label">More</div>
     <div class="nav-item" onclick="showPage('settings')">
@@ -826,6 +834,22 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
       </div>
     </div>
 
+    <!-- ── MODERATION (admin only) ── -->
+    <div id="sec-moderation" class="page-section">
+      <div style="padding:28px 24px 16px;">
+        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:6px;">🛡️ Content Moderation</h2>
+        <p style="color:var(--text3);font-size:.9rem;">Admin only. Permanently removed NFTs are gone forever and will never appear here.</p>
+      </div>
+      <div style="padding:0 24px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <span style="color:var(--text2);font-size:.88rem;">Temp hidden: <strong id="modHiddenCount" style="color:var(--yellow)">0</strong></span>
+        <span style="color:var(--text3);font-size:.8rem;">|</span>
+        <span style="color:var(--text2);font-size:.88rem;">Perm removed: <strong id="modPermCount" style="color:var(--red)">0</strong></span>
+        <span style="color:var(--text3);font-size:.8rem;">|</span>
+        <span style="color:var(--text2);font-size:.88rem;">Banned wallets: <strong id="modBanCount" style="color:var(--red)">0</strong></span>
+      </div>
+      <div class="nft-grid" id="modHiddenGrid" style="padding:0 24px 32px;"></div>
+    </div>
+
   </div><!-- #page -->
 
   <!-- ── ORCA POD LINK ── -->
@@ -943,6 +967,21 @@ const CONTRACT_ADDR  = '0xe7bD4500277f6167B6b454CF2CF529c062B4Ca1a';
 const PLATFORM_WALLET= '0x1F899FaD2C8BD70b6eF356ae6cC3c0abDbB15EB5';
 const AIVM_GATEWAY   = 'https://web-production-0ccfe.up.railway.app/api/aivm';
 // Images stored directly on Lightchain — no external service needed
+
+// ── MODERATION CONSTANTS ──
+const RELAY_SERVER   = 'https://orcavault-production.up.railway.app';
+const OM_GITHUB_RAW  = 'https://raw.githubusercontent.com/Keiko-Dev-LCAI/orcamint/main/moderation/';
+const ADMIN_WALLETS  = [
+  '0xa3a653a8cba0710ff57ac34e2278c603b4259fd3',
+  '0x2b6b64cc13dd6d5acabcf3a5dd72b6ee8004de35'
+];
+
+// ── MODERATION STATE ──
+let permanentHidden = new Set();   // token IDs permanently removed — loaded from GitHub
+let bannedWallets   = new Set();   // wallet addresses banned — loaded from GitHub
+let tempHiddenNFTs  = new Set();   // admin temp hide — session only
+let realNFTs        = [];          // loaded from Lightchain contract
+let modAdminKey     = sessionStorage.getItem('om_ak') || '';
 
 // ── CONTRACT ABI ──
 const ABI = [
@@ -1097,6 +1136,13 @@ function showPage(id) {
   if (id === 'drops') renderDrops();
   if (id === 'activity') renderActivity();
   if (id === 'profile') renderProfile();
+  if (id === 'moderation') {
+    if (!isAdmin()) { showPage('discover'); return; }
+    showModerationView();
+    // Highlight admin nav item manually
+    document.getElementById('nav-moderation')?.classList.add('active');
+    return;
+  }
   // Re-activate correct nav item
   const navMap = { discover:0, collections:1, drops:2, activity:3, studio:4, profile:5, settings:6 };
   document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.remove('active'));
@@ -1160,6 +1206,15 @@ function onWalletConnected() {
   toast('Wallet connected: ' + shortAddr(addr), 'ok');
   renderProfile();
   loadContractData();
+  // Show admin nav + load moderation state
+  const adminNav = document.getElementById('adminNavSection');
+  if (adminNav) adminNav.style.display = isAdmin() ? '' : 'none';
+  if (isAdmin()) {
+    loadModerationLists().then(() => {
+      updateModCounts();
+      renderGallery(); // re-render with moderation filters applied
+    });
+  }
 }
 
 function disconnectWallet() {
@@ -1172,6 +1227,12 @@ function disconnectWallet() {
   document.getElementById('settingsWallet').textContent = '—';
   document.getElementById('settingsNetwork').textContent = '—';
   renderProfile();
+  // Hide admin nav + clear key
+  const adminNav = document.getElementById('adminNavSection');
+  if (adminNav) adminNav.style.display = 'none';
+  modAdminKey = '';
+  sessionStorage.removeItem('om_ak');
+  renderGallery();
 }
 
 window.addEventListener('load', ()=>{
@@ -1183,6 +1244,10 @@ window.addEventListener('load', ()=>{
     if (accs.length) { S.wallet = accs[0]; onWalletConnected(); }
     else disconnectWallet();
   });
+  // Load moderation lists from GitHub (no auth needed — public read)
+  loadModerationLists().then(() => renderGallery());
+  // Load real NFTs from Lightchain in background
+  loadRealNFTs();
   initPage();
 });
 
@@ -1275,28 +1340,43 @@ async function sendTx(method, params, valueEth) {
 
 // ── RENDER DISCOVER ──
 function renderDiscover() {
-  renderNFTGrid('featuredGrid', DEMO_NFTS);
+  renderGallery();
   renderCollectionGrid('trendingCols', DEMO_COLLECTIONS);
   renderDropsGrid('liveDropsGrid', DEMO_DROPS.filter(d=>d.live || (d.launchAt > Date.now() - 3600000)));
 }
 
-function renderNFTGrid(containerId, nfts) {
+function renderGallery() {
+  const nftsToShow = realNFTs.length > 0 ? realNFTs : DEMO_NFTS;
+  const visible = nftsToShow.filter(n => !permanentHidden.has(String(n.id)) && !tempHiddenNFTs.has(String(n.id)));
+  renderNFTGrid('featuredGrid', visible, true);
+}
+
+function renderNFTGrid(containerId, nfts, adminButtons = false) {
   const el = document.getElementById(containerId);
   if (!el) return;
   if (!nfts.length) { el.innerHTML = '<div class="empty-state"><div class="big-icon">🖼️</div><h3>No NFTs yet</h3><p>Be the first to mint on Lightchain!</p><button class="btn btn-primary" onclick="showPage(\'studio\')">Mint Now</button></div>'; return; }
-  el.innerHTML = nfts.map(n => `
-    <div class="nft-card" onclick="openNftModal(${n.id})">
+  el.innerHTML = nfts.map(n => {
+    const showAdmin = adminButtons && isAdmin();
+    const adminHtml = showAdmin ? `
+      <div style="position:absolute;top:8px;left:8px;z-index:5;" onclick="event.stopPropagation()">
+        <button onclick="hideNFTTemp(${n.id})" title="Temp Hide"
+          style="padding:3px 9px;background:rgba(0,0,0,.88);border:1px solid var(--yellow);border-radius:6px;color:var(--yellow);font-size:16px;cursor:pointer;font-weight:700;line-height:1.4;">🗑️</button>
+      </div>` : '';
+    return `
+    <div class="nft-card" onclick="openNftModal(${n.id})" style="position:relative;">
+      ${adminHtml}
       <div class="nft-img">${n.image ? `<img src="${n.image}" alt="${n.name}" loading="lazy">` : `<span style="font-size:3.5rem">${n.emoji||'🖼️'}</span>`}</div>
       <span class="nft-like" onclick="event.stopPropagation();likeNFT(${n.id})">♡</span>
       <div class="nft-info">
         <div class="nft-name">${n.name}</div>
         ${n.collection ? `<div class="nft-collection">${n.collection}</div>` : ''}
         <div class="nft-footer">
-          <div class="nft-price"><strong>${n.price} LCAI</strong></div>
-          ${originLabel(n.origin)}
+          <div class="nft-price"><strong>${n.price||'—'} LCAI</strong></div>
+          ${originLabel(n.origin||0)}
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderCollectionGrid(containerId, cols) {
@@ -1439,7 +1519,8 @@ function showProfileTab(tab) {
     t.classList.toggle('active', tabs[i]===tab);
   });
   const content = document.getElementById('profileContent');
-  const myNFTs = DEMO_NFTS.filter(n => S.wallet && n.creator === shortAddr(S.wallet));
+  const allNFTList = realNFTs.length > 0 ? realNFTs : DEMO_NFTS;
+  const myNFTs = allNFTList.filter(n => S.wallet && n.creator && n.creator.toLowerCase() === S.wallet.toLowerCase());
   if (tab === 'created') {
     if (!myNFTs.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🎨</div><h3>No NFTs minted yet</h3><p>Head to Studio to mint your first NFT on Lightchain</p><button class="btn btn-primary" onclick="showPage('studio')">Go to Studio</button></div>`;
     else { content.innerHTML = '<div class="nft-grid" id="profileNftGrid" style="padding:0"></div>'; renderNFTGrid('profileNftGrid', myNFTs); }
@@ -1457,7 +1538,7 @@ function shareProfile() { copyText(location.href + '?profile=' + S.wallet); toas
 
 // ── NFT DETAIL MODAL ──
 function openNftModal(id) {
-  const nft = DEMO_NFTS.find(n=>n.id===id);
+  const nft = realNFTs.find(n=>n.id===id) || DEMO_NFTS.find(n=>n.id===id);
   if (!nft) return;
   S.activeNftModal = nft;
   const imgEl = document.getElementById('nftModalImg');
@@ -1794,6 +1875,226 @@ async function aivmAnalyzeNFT(id) {
   } catch(e) { el.textContent = 'AIVM analysis unavailable right now.'; }
 }
 
+// ── MODERATION ──────────────────────────────────────────────────────────────
+
+function isAdmin() {
+  return !!(S.wallet && ADMIN_WALLETS.includes(S.wallet.toLowerCase()));
+}
+
+async function getAdminKey() {
+  if (modAdminKey) return modAdminKey;
+  const key = prompt('Enter admin key:');
+  if (!key) return null;
+  modAdminKey = key;
+  sessionStorage.setItem('om_ak', key);
+  return key;
+}
+
+async function loadModerationLists() {
+  try {
+    const ts = Date.now();
+    const [hidR, banR] = await Promise.all([
+      fetch(OM_GITHUB_RAW + 'permanent_hidden.json?t=' + ts).catch(() => null),
+      fetch(OM_GITHUB_RAW + 'banned_wallets.json?t=' + ts).catch(() => null)
+    ]);
+    if (hidR && hidR.ok) {
+      const d = await hidR.json();
+      permanentHidden = new Set(d.map(String));
+    }
+    if (banR && banR.ok) {
+      const d = await banR.json();
+      bannedWallets = new Set(d.map(w => w.toLowerCase()));
+    }
+  } catch(e) { /* silently fail — lists may not exist yet */ }
+}
+
+// ── Real NFT loading from Lightchain RPC (no wallet needed) ──
+
+async function rpcEthCall(selectorHex, paramsHex) {
+  const data = selectorHex + (paramsHex || '');
+  const resp = await fetch('https://rpc.mainnet.lightchain.ai', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({jsonrpc:'2.0', id:1, method:'eth_call', params:[{to:CONTRACT_ADDR, data}, 'latest']})
+  });
+  const d = await resp.json();
+  if (d.error) throw new Error(d.error.message);
+  return d.result;
+}
+
+function decodeAbiString(hex) {
+  if (!hex || hex === '0x') return '';
+  const raw = hex.startsWith('0x') ? hex.slice(2) : hex;
+  if (raw.length < 128) return '';
+  const length = parseInt(raw.slice(64, 128), 16);
+  if (!length || length * 2 > raw.length - 128) return '';
+  const dataHex = raw.slice(128, 128 + length * 2);
+  try {
+    const bytes = new Uint8Array(dataHex.match(/.{2}/g).map(h => parseInt(h, 16)));
+    return new TextDecoder().decode(bytes);
+  } catch(e) { return ''; }
+}
+
+async function loadOneNFT(id) {
+  try {
+    const idHex = id.toString(16).padStart(64, '0');
+    const [uriResult, ownerResult] = await Promise.all([
+      rpcEthCall('0xc87b56dd', idHex),   // tokenURI(uint256)
+      rpcEthCall('0x6352211e', idHex)    // ownerOf(uint256)
+    ]);
+    const uri   = decodeAbiString(uriResult);
+    const owner = '0x' + (ownerResult || '').slice(-40);
+    if (!uri) return null;
+    let meta = {};
+    if (uri.startsWith('data:application/json;base64,')) {
+      try { meta = JSON.parse(atob(uri.slice(29))); } catch(e) {}
+    }
+    return {
+      id,
+      name:        meta.name        || ('Token #' + id),
+      description: meta.description || '',
+      image:       meta.image       || '',
+      origin:      meta.origin      || 0,
+      collection:  meta.collection  || '',
+      creator:     owner,
+      price:       '—',
+      real:        true,
+      attributes:  meta.attributes  || []
+    };
+  } catch(e) { return null; }
+}
+
+async function loadRealNFTs() {
+  try {
+    const nextIdHex = await rpcEthCall('0x75794a3c', '');  // nextTokenId()
+    const nextId = parseInt(nextIdHex, 16);
+    if (!nextId || nextId <= 1) return;
+    const promises = [];
+    for (let id = 1; id < nextId; id++) promises.push(loadOneNFT(id));
+    const results = await Promise.allSettled(promises);
+    const loaded = results
+      .filter(r => r.status === 'fulfilled' && r.value)
+      .map(r => r.value);
+    if (loaded.length > 0) {
+      realNFTs = loaded;
+      renderGallery();
+    }
+  } catch(e) {
+    console.warn('Could not load real NFTs:', e);
+  }
+}
+
+// ── Moderation actions ──
+
+function updateModCounts() {
+  const hc = document.getElementById('modHiddenCount');
+  const pc = document.getElementById('modPermCount');
+  const bc = document.getElementById('modBanCount');
+  const badge = document.getElementById('modBadge');
+  if (hc) hc.textContent = tempHiddenNFTs.size;
+  if (pc) pc.textContent = permanentHidden.size;
+  if (bc) bc.textContent = bannedWallets.size;
+  if (badge) {
+    badge.style.display = tempHiddenNFTs.size > 0 ? '' : 'none';
+    badge.textContent = tempHiddenNFTs.size;
+  }
+}
+
+function hideNFTTemp(tokenId) {
+  tempHiddenNFTs.add(String(tokenId));
+  toast('NFT hidden from public gallery', 'ok', 2500);
+  renderGallery();
+  updateModCounts();
+}
+
+function restoreNFT(tokenId) {
+  tempHiddenNFTs.delete(String(tokenId));
+  toast('NFT restored to gallery', 'ok', 2500);
+  renderGallery();
+  showModerationView();
+  updateModCounts();
+}
+
+async function permRemoveNFT(tokenId) {
+  const key = await getAdminKey();
+  if (!key) return;
+  try {
+    const res = await fetch(RELAY_SERVER + '/api/orcamint/permanent-remove', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tokenId: String(tokenId), adminKey: key})
+    });
+    const d = await res.json();
+    if (!res.ok) { toast(d.error || 'Remove failed', 'err'); return; }
+    permanentHidden.add(String(tokenId));
+    tempHiddenNFTs.delete(String(tokenId));
+    toast('🔒 NFT permanently removed — gone forever', 'ok', 4000);
+    renderGallery();
+    showModerationView();
+    updateModCounts();
+  } catch(e) { toast('Network error: ' + e.message, 'err'); }
+}
+
+async function banAndRemoveNFT(tokenId, creatorWallet) {
+  const key = await getAdminKey();
+  if (!key) return;
+  if (!confirm('Ban wallet ' + (creatorWallet||'').slice(0,16) + '... and permanently remove this NFT? This cannot be undone.')) return;
+  try {
+    const res = await fetch(RELAY_SERVER + '/api/orcamint/ban-wallet', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({wallet: creatorWallet, tokenId: String(tokenId), adminKey: key})
+    });
+    const d = await res.json();
+    if (!res.ok) { toast(d.error || 'Ban failed', 'err'); return; }
+    permanentHidden.add(String(tokenId));
+    bannedWallets.add((creatorWallet||'').toLowerCase());
+    tempHiddenNFTs.delete(String(tokenId));
+    toast('🚫 Wallet banned + NFT permanently removed', 'ok', 4000);
+    renderGallery();
+    showModerationView();
+    updateModCounts();
+  } catch(e) { toast('Network error: ' + e.message, 'err'); }
+}
+
+function showModerationView() {
+  if (!isAdmin()) return;
+  const el = document.getElementById('modHiddenGrid');
+  if (!el) return;
+  updateModCounts();
+  const allNFTs = realNFTs.length > 0 ? realNFTs : DEMO_NFTS;
+  // Show only temp-hidden NFTs that are NOT permanently removed
+  const hiddenNFTs = allNFTs.filter(n =>
+    tempHiddenNFTs.has(String(n.id)) && !permanentHidden.has(String(n.id))
+  );
+  if (!hiddenNFTs.length) {
+    el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="big-icon">✅</div>
+      <h3>No hidden NFTs</h3>
+      <p>All NFTs are currently visible to the public.</p>
+      <p style="font-size:.82rem;color:var(--text3);margin-top:8px;">Permanently removed: ${permanentHidden.size} &nbsp;|&nbsp; Banned wallets: ${bannedWallets.size}</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = hiddenNFTs.map(n => `
+    <div class="nft-card" style="position:relative;border-color:var(--yellow);">
+      <div class="nft-img">${n.image ? `<img src="${n.image}" alt="${n.name}" loading="lazy">` : `<span style="font-size:3.5rem">${n.emoji||'🖼️'}</span>`}</div>
+      <div class="nft-info">
+        <div class="nft-name">${n.name}</div>
+        <div style="font-size:14px;color:var(--yellow);margin-bottom:10px;">🙈 Hidden from public</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px;word-break:break-all;">Creator: ${n.creator||'unknown'}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="restoreNFT(${n.id})"
+            style="padding:7px 12px;background:rgba(0,230,118,.15);border:1px solid var(--green);border-radius:7px;color:var(--green);font-size:16px;cursor:pointer;font-weight:700;">✅ Restore</button>
+          <button onclick="permRemoveNFT(${n.id})"
+            style="padding:7px 12px;background:rgba(124,77,255,.15);border:1px solid var(--purple);border-radius:7px;color:#b39ddb;font-size:16px;cursor:pointer;font-weight:700;">🔒 Perm Remove</button>
+          <button onclick="banAndRemoveNFT(${n.id}, '${(n.creator||'').replace(/'/g, '')}')"
+            style="padding:7px 12px;background:rgba(255,82,82,.15);border:1px solid var(--red);border-radius:7px;color:var(--red);font-size:16px;cursor:pointer;font-weight:700;">🚫 Ban + Remove</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
 // ── SUPPORT CHAT ──
 function toggleSupport() {
   document.getElementById('supportPanel').classList.toggle('open');
@@ -1963,13 +2264,18 @@ function handleSearch(e) {
   const q = e.target.value.toLowerCase().trim();
   if (!q) return;
   if (e.key === 'Enter') {
-    const match = DEMO_NFTS.filter(n=>n.name.toLowerCase().includes(q)||n.collection?.toLowerCase().includes(q));
+    const pool = realNFTs.length > 0 ? realNFTs : DEMO_NFTS;
+    const match = pool.filter(n =>
+      !permanentHidden.has(String(n.id)) &&
+      !tempHiddenNFTs.has(String(n.id)) &&
+      (n.name.toLowerCase().includes(q) || (n.collection||'').toLowerCase().includes(q) || (n.creator||'').toLowerCase().includes(q))
+    );
     if (match.length) {
       showPage('discover');
-      renderNFTGrid('featuredGrid', match);
-      toast(`Found ${match.length} result(s) for "${q}"`, 'info');
+      renderNFTGrid('featuredGrid', match, true);
+      toast('Found ' + match.length + ' result(s) for "' + q + '"', 'info');
     } else {
-      toast(`No results for "${q}"`, 'info');
+      toast('No results for "' + q + '"', 'info');
     }
   }
 }
