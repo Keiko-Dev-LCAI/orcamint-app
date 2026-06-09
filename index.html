@@ -1372,11 +1372,21 @@ function renderNFTGrid(containerId, nfts, adminButtons = false) {
         ${n.collection ? `<div class="nft-collection">${n.collection}</div>` : ''}
         <div class="nft-footer">
           <div class="nft-price"><strong>${n.price||'—'} LCAI</strong></div>
-          ${originLabel(n.origin||0)}
+          <button onclick="event.stopPropagation();shareNFTToLightChat(${JSON.stringify(n.name)},${JSON.stringify(n.collection||'')})" style="background:rgba(155,127,232,0.12);border:1px solid rgba(155,127,232,0.35);color:#9b7fe8;border-radius:6px;padding:4px 10px;font-size:.72rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🔗 Share</button>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function shareNFTToLightChat(name, collection) {
+  const params = new URLSearchParams({
+    app: 'orcamint',
+    title: name || 'NFT',
+    url: 'https://orcamint.xyz',
+    desc: collection || 'OrcaMint NFT on Lightchain'
+  });
+  window.location.href = 'https://lightchat.chat/share?' + params.toString();
 }
 
 function renderCollectionGrid(containerId, cols) {
