@@ -1183,6 +1183,7 @@ function toggleSidebar() {
 }
 
 // ── WALLET ──
+let _walletConnecting = false;
 async function connectWallet() {
   if (!window.ethereum) {
     toast('Please install Trust Wallet to continue', 'err', 4000);
@@ -1215,7 +1216,9 @@ async function connectWallet() {
         }
       }
     }
+    _walletConnecting = true;
     onWalletConnected();
+    setTimeout(() => { _walletConnecting = false; }, 600);
   } catch(e) {
     if (e.code !== 4001) toast('Connection failed: ' + (e.message||e), 'err');
   }
@@ -1277,7 +1280,7 @@ window.addEventListener('load', ()=>{
     onWalletConnected();
   }
   window.ethereum?.on('accountsChanged', accs => {
-    if (accs.length) { S.wallet = accs[0]; onWalletConnected(); }
+    if (accs.length) { S.wallet = accs[0]; if (!_walletConnecting) onWalletConnected(); }
     else disconnectWallet();
   });
   // Load moderation lists from GitHub (no auth needed — public read)
