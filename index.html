@@ -928,23 +928,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
       <h3 style="font-size:1.3rem;font-weight:800;text-align:center;margin-bottom:8px;">Connect Wallet</h3>
       <p style="color:var(--text2);font-size:.9rem;text-align:center;margin-bottom:22px;line-height:1.5;">Choose your wallet to continue. OrcaMint uses native LCAI on Lightchain.</p>
 
-      <button onclick="connectWithProvider(detectSpecificProvider('trust'))"
-        style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:10px;font-family:inherit;">
-        <span style="font-size:28px;flex-shrink:0">🛡️</span>
-        <div>
-          <div style="font-size:18px;font-weight:700;">Trust Wallet</div>
-          <div style="font-size:14px;color:var(--text2);">Connect using Trust Wallet</div>
-        </div>
-      </button>
-
-      <button onclick="connectWithProvider(detectSpecificProvider('metamask'))"
-        style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:10px;font-family:inherit;">
-        <span style="font-size:28px;flex-shrink:0">🦊</span>
-        <div>
-          <div style="font-size:18px;font-weight:700;">MetaMask</div>
-          <div style="font-size:14px;color:var(--text2);">Connect using MetaMask</div>
-        </div>
-      </button>
+      <div id="om-wallet-list"></div>
 
       <a href="https://link.trustwallet.com/open_url?coin_id=60&url=https%3A%2F%2Forcamint.xyz" target="_blank"
         style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;text-decoration:none;color:var(--text);">
@@ -1236,24 +1220,38 @@ function toggleSidebar() {
 // ── WALLET ──
 var OM_DAPP_URL = 'https://orcamint.xyz';
 let activeProvider = null;
-let _walletConnecting = false;
 
-// Detect a specific wallet provider when multiple are installed
-function detectSpecificProvider(type) {
-  if (window.ethereum && window.ethereum.providers && window.ethereum.providers.length) {
-    if (type === 'metamask') {
-      var mm = window.ethereum.providers.find(function(p){ return p.isMetaMask && !p.isTrust && !p.isBraveWallet; });
-      return mm || null;
-    }
-    if (type === 'trust') {
-      var tw = window.ethereum.providers.find(function(p){ return p.isTrust || p.isTrustWallet; });
-      return tw || null;
-    }
-  }
-  return window.ethereum || null;
+// Map a provider object to a display name + icon
+function getWalletInfo(p) {
+  if (p.isTrust || p.isTrustWallet)       return { name: 'Trust Wallet',    icon: '🛡️' };
+  if (p.isCoinbaseWallet || p.isCoinbase)  return { name: 'Coinbase Wallet', icon: '🔵' };
+  if (p.isBraveWallet)                     return { name: 'Brave Wallet',    icon: '🦁' };
+  if (p.isRabby)                           return { name: 'Rabby',           icon: '🐰' };
+  if (p.isRainbow)                         return { name: 'Rainbow',         icon: '🌈' };
+  if (p.isOKExWallet || p.isOKX)          return { name: 'OKX Wallet',      icon: '⭕' };
+  if (p.isTokenPocket)                     return { name: 'TokenPocket',     icon: '💼' };
+  if (p.isBybit)                           return { name: 'Bybit Wallet',    icon: '🟡' };
+  if (p.isMetaMask)                        return { name: 'MetaMask',        icon: '🦊' };
+  return { name: 'Browser Wallet', icon: '🌐' };
 }
 
 function openWalletPicker() {
+  // Build wallet list dynamically from whatever is installed
+  var list = document.getElementById('om-wallet-list');
+  list.innerHTML = '';
+  var providers = window.ethereum
+    ? (window.ethereum.providers && window.ethereum.providers.length
+        ? Array.from(window.ethereum.providers)
+        : [window.ethereum])
+    : [];
+  providers.forEach(function(p) {
+    var info = getWalletInfo(p);
+    var btn = document.createElement('button');
+    btn.style.cssText = 'display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:10px;font-family:inherit;';
+    btn.innerHTML = '<span style="font-size:28px;flex-shrink:0">' + info.icon + '</span><div><div style="font-size:18px;font-weight:700;">' + info.name + '</div><div style="font-size:14px;color:var(--text2);">Connect using ' + info.name + '</div></div>';
+    (function(provider){ btn.onclick = function(){ connectWithProvider(provider); }; })(p);
+    list.appendChild(btn);
+  });
   document.getElementById('om-wallet-picker').classList.add('open');
 }
 
@@ -1299,9 +1297,7 @@ async function connectWithProvider(rawProvider) {
         }
       }
     }
-    _walletConnecting = true;
     onWalletConnected();
-    setTimeout(() => { _walletConnecting = false; }, 600);
   } catch(e) {
     if (e.code !== 4001) toast('Connection failed: ' + (e.message||e), 'err');
   }
@@ -1380,8 +1376,12 @@ window.addEventListener('load', ()=>{
     onWalletConnected();
   }
   window.ethereum?.on('accountsChanged', accs => {
-    if (accs.length) { S.wallet = accs[0]; if (!_walletConnecting) onWalletConnected(); }
-    else disconnectWallet();
+    if (accs.length) {
+      if (accs[0].toLowerCase() !== (S.wallet || '').toLowerCase()) {
+        S.wallet = accs[0];
+        onWalletConnected();
+      }
+    } else disconnectWallet();
   });
   // Load moderation lists from GitHub (no auth needed — public read)
   loadModerationLists().then(() => renderGallery());
