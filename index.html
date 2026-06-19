@@ -919,6 +919,57 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   </div>
 </div>
 
+<!-- ── WALLET PICKER MODAL ── -->
+<div class="modal-overlay" id="om-wallet-picker">
+  <div class="modal-box" style="max-width:400px">
+    <button class="modal-close" onclick="closeWalletPicker()">✕</button>
+    <div style="padding:28px">
+      <div style="font-size:40px;text-align:center;margin-bottom:12px">🔗</div>
+      <h3 style="font-size:1.3rem;font-weight:800;text-align:center;margin-bottom:8px;">Connect Wallet</h3>
+      <p style="color:var(--text2);font-size:.9rem;text-align:center;margin-bottom:22px;line-height:1.5;">Choose your wallet to continue. OrcaMint uses native LCAI on Lightchain.</p>
+
+      <button onclick="connectWithProvider(detectSpecificProvider('trust'))"
+        style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:10px;font-family:inherit;">
+        <span style="font-size:28px;flex-shrink:0">🛡️</span>
+        <div>
+          <div style="font-size:18px;font-weight:700;">Trust Wallet</div>
+          <div style="font-size:14px;color:var(--text2);">Connect using Trust Wallet</div>
+        </div>
+      </button>
+
+      <button onclick="connectWithProvider(detectSpecificProvider('metamask'))"
+        style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:10px;font-family:inherit;">
+        <span style="font-size:28px;flex-shrink:0">🦊</span>
+        <div>
+          <div style="font-size:18px;font-weight:700;">MetaMask</div>
+          <div style="font-size:14px;color:var(--text2);">Connect using MetaMask</div>
+        </div>
+      </button>
+
+      <a href="https://link.trustwallet.com/open_url?coin_id=60&url=https%3A%2F%2Forcamint.xyz" target="_blank"
+        style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;text-decoration:none;color:var(--text);">
+        <span style="font-size:28px;flex-shrink:0">📱</span>
+        <div>
+          <div style="font-size:18px;font-weight:700;">Open in Wallet App</div>
+          <div style="font-size:14px;color:var(--text2);">Use Trust Wallet mobile browser</div>
+        </div>
+      </a>
+
+      <button id="om-copy-link-btn" onclick="copyOrcaMintLink()"
+        style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:18px;font-family:inherit;">
+        <span style="font-size:28px;flex-shrink:0">🔗</span>
+        <div>
+          <div style="font-size:18px;font-weight:700;">Copy Link</div>
+          <div style="font-size:14px;color:var(--text2);">Paste into your wallet's browser</div>
+        </div>
+      </button>
+
+      <button onclick="closeWalletPicker()"
+        style="background:none;border:1px solid var(--border);color:var(--text2);font-size:16px;padding:12px;border-radius:10px;cursor:pointer;font-family:inherit;width:100%;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── TRANSFER NFT MODAL ── -->
 <div class="modal-overlay" id="transferModal">
   <div class="modal-box" style="max-width:420px">
@@ -1183,36 +1234,68 @@ function toggleSidebar() {
 }
 
 // ── WALLET ──
+var OM_DAPP_URL = 'https://orcamint.xyz';
+let activeProvider = null;
 let _walletConnecting = false;
-async function connectWallet() {
-  if (!window.ethereum) {
-    toast('Please install Trust Wallet to continue', 'err', 4000);
+
+// Detect a specific wallet provider when multiple are installed
+function detectSpecificProvider(type) {
+  if (window.ethereum && window.ethereum.providers && window.ethereum.providers.length) {
+    if (type === 'metamask') {
+      var mm = window.ethereum.providers.find(function(p){ return p.isMetaMask && !p.isTrust && !p.isBraveWallet; });
+      return mm || null;
+    }
+    if (type === 'trust') {
+      var tw = window.ethereum.providers.find(function(p){ return p.isTrust || p.isTrustWallet; });
+      return tw || null;
+    }
+  }
+  return window.ethereum || null;
+}
+
+function openWalletPicker() {
+  document.getElementById('om-wallet-picker').classList.add('open');
+}
+
+function closeWalletPicker() {
+  document.getElementById('om-wallet-picker').classList.remove('open');
+}
+
+function copyOrcaMintLink() {
+  navigator.clipboard.writeText(OM_DAPP_URL).then(function() {
+    var btn = document.getElementById('om-copy-link-btn');
+    var orig = btn.innerHTML;
+    btn.innerHTML = '<span style="font-size:26px">✅</span><div style="text-align:left"><div style="font-size:18px;font-weight:700;color:var(--text)">Copied!</div><div style="font-size:15px;color:var(--text2)">Paste into your wallet browser</div></div>';
+    setTimeout(function(){ btn.innerHTML = orig; }, 2000);
+  }).catch(function(){ alert(OM_DAPP_URL); });
+}
+
+// Core connect logic — works with any EIP-1193 provider
+async function connectWithProvider(rawProvider) {
+  if (!rawProvider) {
+    toast('Wallet not detected. Use the options in the picker.', 'err', 4000);
     return;
   }
+  closeWalletPicker();
+  activeProvider = rawProvider;
   try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const accounts = await rawProvider.request({ method: 'eth_requestAccounts' });
     S.wallet = accounts[0];
-    const chainHex = await window.ethereum.request({ method: 'eth_chainId' });
+    const chainHex = await rawProvider.request({ method: 'eth_chainId' });
     const chainId = parseInt(chainHex, 16);
     if (chainId !== CHAIN_ID) {
       toast('Switching to Lightchain network…', 'info');
       try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x' + CHAIN_ID.toString(16) }]
-        });
+        await rawProvider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x' + CHAIN_ID.toString(16) }] });
       } catch (e) {
         if (e.code === 4902) {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0x' + CHAIN_ID.toString(16),
-              chainName: 'Lightchain AI',
-              nativeCurrency: { name: 'LCAI', symbol: 'LCAI', decimals: 18 },
-              rpcUrls: ['https://rpc.mainnet.lightchain.ai'],
-              blockExplorerUrls: ['https://explorer.lightchain.ai']
-            }]
-          });
+          await rawProvider.request({ method: 'wallet_addEthereumChain', params: [{
+            chainId: '0x' + CHAIN_ID.toString(16),
+            chainName: 'Lightchain AI',
+            nativeCurrency: { name: 'LCAI', symbol: 'LCAI', decimals: 18 },
+            rpcUrls: ['https://rpc.mainnet.lightchain.ai'],
+            blockExplorerUrls: ['https://explorer.lightchain.ai']
+          }]});
         }
       }
     }
@@ -1222,6 +1305,21 @@ async function connectWallet() {
   } catch(e) {
     if (e.code !== 4001) toast('Connection failed: ' + (e.message||e), 'err');
   }
+}
+
+async function connectWallet() {
+  // Multiple wallets installed → always let user choose
+  if (window.ethereum && window.ethereum.providers && window.ethereum.providers.length > 1) {
+    openWalletPicker();
+    return;
+  }
+  // No wallet at all → show picker with install links
+  if (!window.ethereum) {
+    openWalletPicker();
+    return;
+  }
+  // Single provider → connect directly
+  await connectWithProvider(window.ethereum);
 }
 
 function onWalletConnected() {
@@ -1254,6 +1352,7 @@ function onWalletConnected() {
 
 function disconnectWallet() {
   S.wallet = null;
+  activeProvider = null;
   document.getElementById('walletBtnIcon').textContent = '🔗';
   document.getElementById('walletBtnText').textContent = 'Connect Wallet';
   document.getElementById('walletAddr').textContent = '';
@@ -1276,6 +1375,7 @@ function disconnectWallet() {
 
 window.addEventListener('load', ()=>{
   if (window.ethereum && window.ethereum.selectedAddress) {
+    activeProvider = window.ethereum;
     S.wallet = window.ethereum.selectedAddress;
     onWalletConnected();
   }
@@ -1358,7 +1458,7 @@ async function sendTx(method, params, valueEth) {
     return null;
   }
   try {
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const provider = new ethers.providers.Web3Provider(activeProvider || window.ethereum);
     const signer = provider.getSigner();
     const contract = new ethers.Contract(CONTRACT_ADDR, ABI, signer);
     const valFloat = valueEth ? parseFloat(valueEth) : 0;
