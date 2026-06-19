@@ -1222,7 +1222,35 @@ var OM_DAPP_URL = 'https://orcamint.xyz';
 let activeProvider = null;
 let _connectingInProgress = false;
 
-// Map a provider object to a display name + icon
+// EIP-6963: collect every wallet extension that announces itself
+let _eip6963Providers = [];
+window.addEventListener('eip6963:announceProvider', function(e) {
+  if (!e.detail?.provider) return;
+  var rdns = e.detail.info?.rdns || e.detail.info?.uuid || '';
+  if (!_eip6963Providers.some(function(d){ return (d.info?.rdns || d.info?.uuid || '') === rdns; })) {
+    _eip6963Providers.push(e.detail);
+  }
+});
+// Ask all installed wallet extensions to announce themselves now
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+// Emoji icon by wallet name/rdns (for EIP-6963 entries)
+function getIconByName(name, rdns) {
+  var n = (name || '').toLowerCase();
+  var r = (rdns || '').toLowerCase();
+  if (n.includes('trust') || r.includes('trust')) return '🛡️';
+  if (n.includes('metamask') || r.includes('metamask')) return '🦊';
+  if (n.includes('coinbase') || r.includes('coinbase')) return '🔵';
+  if (n.includes('brave') || r.includes('brave')) return '🦁';
+  if (n.includes('rabby') || r.includes('rabby')) return '🐰';
+  if (n.includes('rainbow') || r.includes('rainbow')) return '🌈';
+  if (n.includes('okx') || n.includes('okex') || r.includes('okx')) return '⭕';
+  if (n.includes('tokenpocket') || r.includes('tokenpocket')) return '💼';
+  if (n.includes('bybit') || r.includes('bybit')) return '🟡';
+  return '🌐';
+}
+
+// Legacy flag-based detection (fallback)
 function getWalletInfo(p) {
   if (p.isTrust || p.isTrustWallet)       return { name: 'Trust Wallet',    icon: '🛡️' };
   if (p.isCoinbaseWallet || p.isCoinbase)  return { name: 'Coinbase Wallet', icon: '🔵' };
@@ -1237,22 +1265,41 @@ function getWalletInfo(p) {
 }
 
 function openWalletPicker() {
-  // Build wallet list dynamically from whatever is installed
+  // Re-request — picks up any wallet that loaded after page init
+  window.dispatchEvent(new Event('eip6963:requestProvider'));
+
   var list = document.getElementById('om-wallet-list');
   list.innerHTML = '';
-  var providers = window.ethereum
-    ? (window.ethereum.providers && window.ethereum.providers.length
-        ? Array.from(window.ethereum.providers)
-        : [window.ethereum])
-    : [];
-  providers.forEach(function(p) {
-    var info = getWalletInfo(p);
+
+  // Build wallet list — prefer EIP-6963 (finds all extensions reliably),
+  // fall back to legacy window.ethereum.providers
+  var items = [];
+  if (_eip6963Providers.length > 0) {
+    _eip6963Providers.forEach(function(d) {
+      items.push({
+        provider: d.provider,
+        name: d.info?.name || 'Browser Wallet',
+        icon: getIconByName(d.info?.name, d.info?.rdns)
+      });
+    });
+  } else {
+    var legacy = window.ethereum
+      ? (window.ethereum.providers?.length ? Array.from(window.ethereum.providers) : [window.ethereum])
+      : [];
+    legacy.forEach(function(p) {
+      var i = getWalletInfo(p);
+      items.push({ provider: p, name: i.name, icon: i.icon });
+    });
+  }
+
+  items.forEach(function(item) {
     var btn = document.createElement('button');
     btn.style.cssText = 'display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:10px;font-family:inherit;';
-    btn.innerHTML = '<span style="font-size:28px;flex-shrink:0">' + info.icon + '</span><div><div style="font-size:18px;font-weight:700;">' + info.name + '</div><div style="font-size:14px;color:var(--text2);">Connect using ' + info.name + '</div></div>';
-    (function(provider){ btn.onclick = function(){ connectWithProvider(provider); }; })(p);
+    btn.innerHTML = '<span style="font-size:28px;flex-shrink:0">' + item.icon + '</span><div><div style="font-size:18px;font-weight:700;">' + item.name + '</div><div style="font-size:14px;color:var(--text2);">Connect using ' + item.name + '</div></div>';
+    (function(provider){ btn.onclick = function(){ connectWithProvider(provider); }; })(item.provider);
     list.appendChild(btn);
   });
+
   document.getElementById('om-wallet-picker').classList.add('open');
 }
 
