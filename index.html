@@ -903,9 +903,10 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
     <button class="modal-close" onclick="document.getElementById('listModal').classList.remove('open')">✕</button>
     <div style="padding:28px">
       <h3 style="font-size:1.2rem;font-weight:800;margin-bottom:6px;">List for Sale</h3>
-      <p style="color:var(--text3);font-size:.85rem;margin-bottom:20px;">Set a price in LCAI. Buyers can purchase immediately or make offers.</p>
+      <p style="color:var(--text3);font-size:.85rem;margin-bottom:8px;">Set a price in LCAI. Buyers can purchase immediately or make offers.</p>
+      <div style="font-size:.75rem;color:var(--cyan);margin-bottom:16px;">💡 Payment is in <strong>native LCAI</strong> on Lightchain mainnet — not ERC-20 LCAI on Ethereum</div>
       <div class="form-group">
-        <label class="form-label">Sale Price (LCAI)</label>
+        <label class="form-label">Sale Price (native LCAI)</label>
         <input class="form-input" id="listPrice" type="number" min="0.001" step="0.001" placeholder="0.00">
       </div>
       <div class="fee-preview">
@@ -914,6 +915,25 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
         <div class="fee-row fee-total"><span class="lbl fw700">You receive</span><span class="val text-cyan" id="listSellerPreview">—</span></div>
       </div>
       <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="submitListing()">List NFT</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TRANSFER NFT MODAL ── -->
+<div class="modal-overlay" id="transferModal">
+  <div class="modal-box" style="max-width:420px">
+    <button class="modal-close" onclick="document.getElementById('transferModal').classList.remove('open')">✕</button>
+    <div style="padding:28px">
+      <h3 style="font-size:1.2rem;font-weight:800;margin-bottom:6px;">↗️ Transfer NFT</h3>
+      <p style="color:var(--text3);font-size:.85rem;margin-bottom:20px;">Send this NFT to another wallet. This cannot be undone.</p>
+      <div class="form-group">
+        <label class="form-label">Recipient Wallet Address</label>
+        <input class="form-input" id="transferRecipient" type="text" placeholder="0x…">
+      </div>
+      <div style="background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.25);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:.8rem;color:var(--red);">
+        ⚠️ Transfer is permanent. You will no longer own this NFT.
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="submitTransfer()">Transfer NFT</button>
     </div>
   </div>
 </div>
@@ -1012,7 +1032,8 @@ const ABI = [
   {"inputs":[{"name":"","type":"uint256"}],"name":"hiddenTokens","outputs":[{"name":"","type":"bool"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"name":"","type":"uint256"}],"name":"tokenCollection","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"name":"tokenId","type":"uint256"}],"name":"getApproved","outputs":[{"name":"","type":"address"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"name":"approved","type":"address"},{"name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"nonpayable","type":"function"}
+  {"inputs":[{"name":"approved","type":"address"},{"name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"name":"from","type":"address"},{"name":"to","type":"address"},{"name":"tokenId","type":"uint256"}],"name":"transferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ];
 
 // ── STATE ──
@@ -1204,9 +1225,14 @@ function onWalletConnected() {
   const addr = S.wallet;
   document.getElementById('walletBtnIcon').textContent = '✅';
   document.getElementById('walletBtnText').textContent = shortAddr(addr);
-  document.getElementById('walletAddr').textContent = shortAddr(addr);
+  document.getElementById('walletAddr').textContent = 'Tap to disconnect';
+  document.getElementById('walletAddr').style.cursor = 'pointer';
+  document.getElementById('walletAddr').onclick = disconnectWallet;
+  document.getElementById('walletBtn').onclick = disconnectWallet;
   const mwb = document.getElementById('mobileWalletBtnText');
   if (mwb) mwb.textContent = '✅';
+  const mobileBtn = document.getElementById('mobileWalletBtn');
+  if (mobileBtn) mobileBtn.onclick = disconnectWallet;
   document.getElementById('settingsWallet').textContent = addr;
   document.getElementById('settingsNetwork').innerHTML = '<span style="color:var(--green)">✓ Lightchain</span>';
   toast('Wallet connected: ' + shortAddr(addr), 'ok');
@@ -1228,8 +1254,12 @@ function disconnectWallet() {
   document.getElementById('walletBtnIcon').textContent = '🔗';
   document.getElementById('walletBtnText').textContent = 'Connect Wallet';
   document.getElementById('walletAddr').textContent = '';
+  document.getElementById('walletAddr').onclick = null;
+  document.getElementById('walletBtn').onclick = connectWallet;
   const mwb = document.getElementById('mobileWalletBtnText');
   if (mwb) mwb.textContent = '🔗';
+  const mobileBtn = document.getElementById('mobileWalletBtn');
+  if (mobileBtn) mobileBtn.onclick = connectWallet;
   document.getElementById('settingsWallet').textContent = '—';
   document.getElementById('settingsNetwork').textContent = '—';
   renderProfile();
@@ -1559,6 +1589,22 @@ function openNftModal(id) {
   S.activeNftModal = nft;
   const imgEl = document.getElementById('nftModalImg');
   imgEl.innerHTML = nft.image ? `<img src="${nft.image}" alt="${nft.name}">` : `<span style="font-size:6rem">${nft.emoji||'🖼️'}</span>`;
+  const isOwner = S.wallet && nft.creator && nft.creator.toLowerCase() === S.wallet.toLowerCase();
+  const isListed = nft.price && nft.price !== '—' && parseFloat(nft.price) > 0;
+  const actionsHtml = isOwner
+    ? `<div class="detail-actions">
+        <button class="btn btn-primary" onclick="openListModal(${nft.id})">🏷️ ${isListed ? 'Change Price' : 'List for Sale'}</button>
+        <button class="btn btn-outline" onclick="openTransferModal(${nft.id})">↗️ Transfer</button>
+      </div>`
+    : isListed
+      ? `<div class="detail-actions">
+          <button class="btn btn-primary" onclick="buyNFT(${nft.id})">Buy Now</button>
+          <button class="btn btn-outline" onclick="openOfferModal(${nft.id})">Make Offer</button>
+        </div>`
+      : `<div class="detail-actions">
+          <button class="btn btn-outline" onclick="openOfferModal(${nft.id})">Make Offer</button>
+        </div>
+        <div style="text-align:center;color:var(--text3);font-size:.82rem;margin-top:6px;">Not listed for sale</div>`;
   document.getElementById('nftModalInfo').innerHTML = `
     <div class="nft-detail-collection" onclick="openCollection(1)">${nft.collection||'Standalone NFT'}</div>
     <div class="nft-detail-name">${nft.name}</div>
@@ -1566,12 +1612,10 @@ function openNftModal(id) {
     <div class="owner-row"><div class="owner-avatar">${nft.creator.slice(2,4)}</div><span>Owned by</span><strong>${nft.creator}</strong></div>
     <div class="price-box">
       <div class="lbl">Current price</div>
-      <div class="price">${nft.price} <span>LCAI</span></div>
+      <div class="price">${isListed ? nft.price + ' <span>LCAI</span>' : '<span style="font-size:1rem;color:var(--text3)">Not listed</span>'}</div>
+      ${isListed ? `<div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Native LCAI &middot; Lightchain mainnet</div>` : ''}
     </div>
-    <div class="detail-actions">
-      <button class="btn btn-primary" onclick="buyNFT(${nft.id})">Buy Now</button>
-      <button class="btn btn-outline" onclick="openOfferModal(${nft.id})">Make Offer</button>
-    </div>
+    ${actionsHtml}
     <div class="detail-section">
       <div class="detail-section-title">Description</div>
       <p style="font-size:.88rem;color:var(--text2);line-height:1.6;">${nft.name} — a unique piece on Lightchain. ${nft.origin===2?'Generated entirely by Lightchain AIVM.':nft.origin===1?'Enhanced by Lightchain AIVM.':'Original artwork by the creator.'}</p>
@@ -1602,9 +1646,12 @@ function openCollection(id) {
 
 // ── BUY / OFFER ──
 async function buyNFT(id) {
-  const nft = DEMO_NFTS.find(n=>n.id===id);
+  const nft = realNFTs.find(n=>n.id===id) || DEMO_NFTS.find(n=>n.id===id);
   if (!nft) return;
   if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
+  if (!nft.price || nft.price === '—' || parseFloat(nft.price) <= 0) {
+    toast('This NFT is not listed for sale', 'err'); return;
+  }
   await sendTx('buy', [id], nft.price);
 }
 
@@ -1646,8 +1693,33 @@ async function submitListing() {
   const price = document.getElementById('listPrice').value;
   if (!price || price <= 0) { toast('Enter a valid price', 'err'); return; }
   if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
-  await sendTx('listForSale', [id, Math.round(parseFloat(price)*1e18).toString()], '0');
-  document.getElementById('listModal').classList.remove('open');
+  const receipt = await sendTx('listForSale', [id, Math.round(parseFloat(price)*1e18).toString()], '0');
+  if (receipt) {
+    document.getElementById('listModal').classList.remove('open');
+    toast('NFT listed for sale!', 'ok', 4000);
+    setTimeout(loadRealNFTs, 2000);
+  }
+}
+
+function openTransferModal(id) {
+  document.getElementById('transferModal').classList.add('open');
+  document.getElementById('transferModal').dataset.tokenId = id;
+  document.getElementById('transferRecipient').value = '';
+}
+
+async function submitTransfer() {
+  const id = parseInt(document.getElementById('transferModal').dataset.tokenId);
+  const to = document.getElementById('transferRecipient').value.trim();
+  if (!to || !/^0x[0-9a-fA-F]{40}$/.test(to)) { toast('Enter a valid wallet address (0x…)', 'err'); return; }
+  if (to.toLowerCase() === (S.wallet || '').toLowerCase()) { toast('Cannot transfer to yourself', 'err'); return; }
+  if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
+  const receipt = await sendTx('transferFrom', [S.wallet, to, id], '0');
+  if (receipt) {
+    toast('✅ NFT transferred!', 'ok', 5000);
+    document.getElementById('transferModal').classList.remove('open');
+    closeNftModal();
+    setTimeout(loadRealNFTs, 2000);
+  }
 }
 
 // ── MINT ──
@@ -1954,9 +2026,10 @@ function decodeAbiString(hex) {
 async function loadOneNFT(id) {
   try {
     const idHex = id.toString(16).padStart(64, '0');
-    const [uriResult, ownerResult] = await Promise.all([
+    const [uriResult, ownerResult, listing] = await Promise.all([
       rpcEthCall('0xc87b56dd', idHex),   // tokenURI(uint256)
-      rpcEthCall('0x6352211e', idHex)    // ownerOf(uint256)
+      rpcEthCall('0x6352211e', idHex),   // ownerOf(uint256)
+      readContractView('listings', id)   // listings(uint256) → {seller, price}
     ]);
     const uri   = decodeAbiString(uriResult);
     const owner = '0x' + (ownerResult || '').slice(-40);
@@ -1965,6 +2038,12 @@ async function loadOneNFT(id) {
     if (uri.startsWith('data:application/json;base64,')) {
       try { meta = JSON.parse(atob(uri.slice(29))); } catch(e) {}
     }
+    let price = '—';
+    try {
+      if (listing && listing.price && ethers.BigNumber.from(listing.price).gt(0)) {
+        price = parseFloat(ethers.utils.formatEther(listing.price)).toFixed(3).replace(/\.?0+$/, '');
+      }
+    } catch(e) {}
     return {
       id,
       name:        meta.name        || ('Token #' + id),
@@ -1973,10 +2052,19 @@ async function loadOneNFT(id) {
       origin:      meta.origin      || 0,
       collection:  meta.collection  || '',
       creator:     owner,
-      price:       '—',
+      price,
       real:        true,
       attributes:  meta.attributes  || []
     };
+  } catch(e) { return null; }
+}
+
+// ── READ CONTRACT (view only, no wallet needed) ──
+async function readContractView(method, ...args) {
+  try {
+    const provider = new ethers.providers.JsonRpcProvider('https://rpc.mainnet.lightchain.ai');
+    const contract = new ethers.Contract(CONTRACT_ADDR, ABI, provider);
+    return await contract[method](...args);
   } catch(e) { return null; }
 }
 
