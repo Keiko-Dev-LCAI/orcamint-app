@@ -930,23 +930,6 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 
       <div id="om-wallet-list"></div>
 
-      <a href="https://link.trustwallet.com/open_url?coin_id=60&url=https%3A%2F%2Forcamint.xyz" target="_blank"
-        style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;text-decoration:none;color:var(--text);">
-        <span style="font-size:28px;flex-shrink:0">🛡️</span>
-        <div>
-          <div style="font-size:18px;font-weight:700;">Trust Wallet</div>
-          <div style="font-size:14px;color:var(--text2);">Open in Trust Wallet mobile</div>
-        </div>
-      </a>
-      <a href="https://metamask.app.link/dapp/orcamint.xyz" target="_blank"
-        style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;text-decoration:none;color:var(--text);">
-        <span style="font-size:28px;flex-shrink:0">🦊</span>
-        <div>
-          <div style="font-size:18px;font-weight:700;">MetaMask</div>
-          <div style="font-size:14px;color:var(--text2);">Open in MetaMask mobile</div>
-        </div>
-      </a>
-
       <button id="om-copy-link-btn" onclick="copyOrcaMintLink()"
         style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:18px;font-family:inherit;">
         <span style="font-size:28px;flex-shrink:0">🔗</span>
@@ -1029,6 +1012,12 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 <div id="toastZone"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<script type="module">
+  try {
+    const { EthereumProvider } = await import('https://esm.sh/@walletconnect/ethereum-provider@2.17.3');
+    window.WCEthereumProvider = EthereumProvider;
+  } catch(e) { console.warn('WalletConnect unavailable:', e); }
+</script>
 <script>
 // ── CONSTANTS ──
 const CHAIN_ID       = 9200;
@@ -1229,6 +1218,7 @@ function toggleSidebar() {
 var OM_DAPP_URL = 'https://orcamint.xyz';
 let activeProvider = null;
 let _connectingInProgress = false;
+let _wcProv = null;
 
 // EIP-6963: collect every wallet extension that announces itself
 let _eip6963Providers = [];
@@ -1308,6 +1298,16 @@ function openWalletPicker() {
     list.appendChild(btn);
   });
 
+  // WalletConnect — QR code on desktop, wallet app deep links on mobile
+  if (window.WCEthereumProvider) {
+    var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    var wcBtn = document.createElement('button');
+    wcBtn.style.cssText = 'display:flex;align-items:center;gap:14px;background:rgba(0,229,255,0.06);border:1px solid var(--cyan);border-radius:12px;padding:14px 16px;width:100%;text-align:left;color:var(--text);cursor:pointer;margin-bottom:10px;font-family:inherit;';
+    wcBtn.innerHTML = '<span style="font-size:28px;flex-shrink:0">🔗</span><div><div style="font-size:18px;font-weight:700;">WalletConnect</div><div style="font-size:14px;color:var(--text2);">' + (isMobile ? 'Open any wallet app' : 'Scan QR with any wallet') + '</div></div>';
+    wcBtn.onclick = connectViaWalletConnect;
+    list.appendChild(wcBtn);
+  }
+
   document.getElementById('om-wallet-picker').classList.add('open');
 }
 
@@ -1367,6 +1367,31 @@ async function connectWallet() {
   openWalletPicker();
 }
 
+async function connectViaWalletConnect() {
+  closeWalletPicker();
+  if (!window.WCEthereumProvider) { toast('WalletConnect not loaded yet. Try again.', 'err'); return; }
+  try {
+    _wcProv = await window.WCEthereumProvider.init({
+      projectId: '3c6a0da53258912a28923198ddac3333',
+      chains: [9200],
+      optionalChains: [1],
+      showQrModal: true,
+      metadata: {
+        name: 'OrcaMint',
+        description: 'First NFT Platform on Lightchain',
+        url: 'https://orcamint.xyz',
+        icons: ['https://orcamint.xyz/orca-icon.png']
+      },
+      rpcMap: { 9200: 'https://rpc.mainnet.lightchain.ai' }
+    });
+    await _wcProv.enable();
+    await connectWithProvider(_wcProv);
+  } catch(e) {
+    if (!e || e.message?.includes('User rejected') || e.message?.includes('rejected') || e.code === 4001) return;
+    toast('WalletConnect failed. Try a different wallet.', 'err');
+  }
+}
+
 function onWalletConnected() {
   const addr = S.wallet;
   document.getElementById('walletBtnIcon').textContent = '✅';
@@ -1398,6 +1423,7 @@ function onWalletConnected() {
 function disconnectWallet() {
   S.wallet = null;
   activeProvider = null;
+  if (_wcProv) { try { _wcProv.disconnect(); } catch {} _wcProv = null; }
   document.getElementById('walletBtnIcon').textContent = '🔗';
   document.getElementById('walletBtnText').textContent = 'Connect Wallet';
   document.getElementById('walletAddr').textContent = '';
