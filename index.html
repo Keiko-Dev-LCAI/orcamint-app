@@ -1126,6 +1126,17 @@ function formatLCAI(wei) {
   const n = Number(BigInt(wei)) / 1e18;
   return n % 1 === 0 ? n.toString() : n.toFixed(3).replace(/\.?0+$/, '');
 }
+function lcaiToWei(priceStr) {
+  const trimmed = String(priceStr).trim();
+  if (!trimmed || !/^-?\d+(\.\d+)?$/.test(trimmed) || parseFloat(trimmed) <= 0) return null;
+  try { return ethers.utils.parseEther(trimmed).toString(); }
+  catch(e) { return null; }
+}
+function formatLcaiAmount(n) {
+  const v = parseFloat(n) || 0;
+  if (v >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 3 });
+  return v.toFixed(3).replace(/\.?0+$/, '');
+}
 
 // ── USD PRICING ──
 let LCAI_USD_PRICE = 0.004; // fallback, refreshed on load
@@ -1898,17 +1909,18 @@ function updateListPreview() {
   const platform = price * 0.025;
   const royalty = price * 0.05; // assume 5%
   const seller = price - platform - royalty;
-  document.getElementById('listFeePreview').textContent = platform.toFixed(3) + ' LCAI';
-  document.getElementById('listRoyaltyPreview').textContent = royalty.toFixed(3) + ' LCAI';
-  document.getElementById('listSellerPreview').textContent = seller.toFixed(3) + ' LCAI';
+  document.getElementById('listFeePreview').textContent = formatLcaiAmount(platform) + ' LCAI';
+  document.getElementById('listRoyaltyPreview').textContent = formatLcaiAmount(royalty) + ' LCAI';
+  document.getElementById('listSellerPreview').textContent = formatLcaiAmount(seller) + ' LCAI';
 }
 
 async function submitListing() {
-  const id = document.getElementById('listModal').dataset.tokenId;
+  const id = parseInt(document.getElementById('listModal').dataset.tokenId, 10);
   const price = document.getElementById('listPrice').value;
-  if (!price || price <= 0) { toast('Enter a valid price', 'err'); return; }
+  const priceWei = lcaiToWei(price);
+  if (!priceWei) { toast('Enter a valid price', 'err'); return; }
   if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
-  const receipt = await sendTx('listForSale', [id, Math.round(parseFloat(price)*1e18).toString()], '0');
+  const receipt = await sendTx('listForSale', [id, priceWei], '0');
   if (receipt) {
     document.getElementById('listModal').classList.remove('open');
     toast('NFT listed for sale!', 'ok', 4000);
@@ -2142,7 +2154,7 @@ async function createCollection() {
   if (!name) { toast('Give the collection a name', 'err'); return; }
   let imageURI = '';
   if (S.uploadedColFile) imageURI = await encodeImageForChain(S.uploadedColFile);
-  const mintPriceWei = mintPrice > 0 ? Math.round(mintPrice*1e18).toString() : '0';
+  const mintPriceWei = mintPrice > 0 ? (lcaiToWei(String(mintPrice)) || '0') : '0';
   await fetchLcaiPrice();
   const colFeeEth = usdToLcaiStr(COLLECTION_FEE_USD);
   await sendTx('createCollection', [name, desc, imageURI, maxSupply, mintPriceWei, launchTs], colFeeEth);
