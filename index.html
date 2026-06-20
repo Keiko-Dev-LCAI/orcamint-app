@@ -1548,7 +1548,9 @@ async function sendTx(method, params, valueEth) {
     return receipt;
   } catch(e) {
     if (e.code === 4001 || e.code === 'ACTION_REJECTED') toast('Transaction cancelled', 'err');
-    else toast('Error: ' + (e.reason || e.message || 'Unknown error'), 'err');
+    else if ((e.message || '').includes('Internal JSON-RPC error')) {
+      toast('Mint tx too large for RPC — image/metadata may be too big. Try a smaller image or refresh and retry.', 'err', 6000);
+    } else toast('Error: ' + (e.reason || e.message || 'Unknown error'), 'err');
     return null;
   }
 }
@@ -1968,13 +1970,34 @@ function loadCollectionsForMintDropdown() {
   });
 }
 
+const ONCHAIN_IMAGE_MAX_KB = 40; // image payload budget inside tokenURI (mint is one big string tx)
+const MAX_TOKEN_URI_CHARS = 88000; // stay under Lightchain RPC tx input limits
+
+function estimateTokenUriChars(imageURI, name, desc, tags, origin) {
+  const metadata = {
+    name, description: desc,
+    image: imageURI,
+    attributes: tags.split(',').filter(Boolean).map(t => ({ trait_type: 'Tag', value: t.trim() })),
+    origin
+  };
+  return ('data:application/json;base64,' + btoa(JSON.stringify(metadata))).length;
+}
+
 async function encodeImageForChain(file) {
-  // Compress and encode image as base64 data URI for permanent on-chain storage
+  // Compress and encode image as base64 data URI for permanent on-chain storage.
+  // Mint puts the full metadata string in one tx — oversized images cause RPC errors.
   return new Promise((resolve, reject) => {
     if (file.type.startsWith('video/')) {
-      // Videos: read as base64 directly (user is responsible for size)
       const reader = new FileReader();
-      reader.onload = e => resolve(e.target.result);
+      reader.onload = e => {
+        const dataURI = e.target.result;
+        const kb = Math.round(dataURI.length * 0.75 / 1024);
+        if (kb > ONCHAIN_IMAGE_MAX_KB) {
+          reject(new Error(`Video too large for on-chain mint (~${kb}KB). Use a shorter clip or smaller file.`));
+          return;
+        }
+        resolve(dataURI);
+      };
       reader.onerror = reject;
       reader.readAsDataURL(file);
       return;
@@ -1982,22 +2005,35 @@ async function encodeImageForChain(file) {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX = 1024;
-      let w = img.width, h = img.height;
-      if (w > MAX || h > MAX) {
-        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-        else { w = Math.round(w * MAX / h); h = MAX; }
+      // Always JPEG on-chain — PNG data URIs blow past RPC tx size limits.
+      let maxSide = 512;
+      let quality = 0.68;
+      let dataURI = '';
+      for (let attempt = 0; attempt < 10; attempt++) {
+        let w = img.width, h = img.height;
+        if (w > maxSide || h > maxSide) {
+          if (w > h) { h = Math.round(h * maxSide / w); w = maxSide; }
+          else { w = Math.round(w * maxSide / h); h = maxSide; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        dataURI = canvas.toDataURL('image/jpeg', quality);
+        const kb = Math.round(dataURI.length * 0.75 / 1024);
+        console.log(`On-chain image attempt ${attempt + 1}: ${w}x${h} jpeg q=${quality.toFixed(2)} ~${kb}KB`);
+        if (kb <= ONCHAIN_IMAGE_MAX_KB) break;
+        maxSide = Math.max(192, Math.round(maxSide * 0.72));
+        quality = Math.max(0.38, quality - 0.07);
       }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
       URL.revokeObjectURL(url);
-      const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-      const quality  = file.type === 'image/png' ? undefined : 0.85;
-      const dataURI  = canvas.toDataURL(mimeType, quality);
-      const kb = Math.round(dataURI.length * 0.75 / 1024);
-      console.log(`On-chain image: ${w}x${h} ${mimeType} ~${kb}KB`);
+      const finalKb = Math.round(dataURI.length * 0.75 / 1024);
+      if (finalKb > ONCHAIN_IMAGE_MAX_KB) {
+        reject(new Error(`Image still too large after compression (~${finalKb}KB). Try a simpler/smaller JPG.`));
+        return;
+      }
       resolve(dataURI);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
@@ -2031,6 +2067,10 @@ async function mintNFT() {
     };
     // Full metadata + image stored permanently on Lightchain — no external service
     const tokenURI = 'data:application/json;base64,' + btoa(JSON.stringify(metadata));
+    if (tokenURI.length > MAX_TOKEN_URI_CHARS) {
+      throw new Error(`Metadata too large for one mint tx (${Math.round(tokenURI.length / 1024)}KB). Shorten description or use a smaller image.`);
+    }
+    console.log(`Mint tokenURI ~${Math.round(tokenURI.length / 1024)}KB`);
     const royaltyBps = Math.round(royaltyPct * 100);
 
     btn.textContent = '⏳ Minting on Lightchain…';
