@@ -68,8 +68,10 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 #walletAddr { font-size: .72rem; color: var(--text3); text-align: center; margin-top: 6px; word-break: break-all; }
 
 /* ── MAIN ── */
-#main { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; display: flex; flex-direction: column; min-width: 0; }
-#page { min-width: 0; overflow-x: hidden; }
+#main {
+  margin-left: var(--sidebar-w); flex: 1; height: 100vh; display: flex; flex-direction: column;
+  min-width: 0; overflow: hidden;
+}
 
 /* ── TOPBAR ── */
 #topbar {
@@ -94,7 +96,16 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .notif-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; background: var(--red); border-radius: 50%; border: 2px solid var(--bg2); }
 
 /* ── PAGE CONTENT ── */
-#page { flex: 1; padding: 0; overflow: auto; }
+#page { flex: 1 1 auto; min-height: 0; padding: 0; overflow-x: hidden; overflow-y: auto; }
+#site-footer {
+  flex-shrink: 0; background: var(--bg2); border-top: 1px solid rgba(255,255,255,0.07);
+  z-index: 40; box-shadow: 0 -6px 28px rgba(0,0,0,.4);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.site-footer-pod { text-align: center; padding: 12px 20px 6px; }
+.site-footer-links { padding: 6px 16px 12px; text-align: center; }
+.site-footer-links a { color: #9b7fe8; text-decoration: none; font-weight: 600; font-size: 13px; }
+.site-footer-pod a { color: #7ec8e3; font-size: 13px; text-decoration: none; font-weight: 600; letter-spacing: .02em; }
 .page-section { display: none; }
 .page-section.active { display: block; max-width: 920px; margin: 0 auto; }
 
@@ -890,16 +901,16 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 
   </div><!-- #page -->
 
-  <!-- ── ORCA POD LINK ── -->
-  <div style="text-align:center;padding:16px 20px;border-top:1px solid rgba(255,255,255,0.07);">
-    <a href="https://keiko-dev-lcai.github.io/orcapod/" target="_blank" style="color:#7ec8e3;font-size:13px;text-decoration:none;font-weight:600;letter-spacing:.02em;">🐬 Other Orca dApps →</a>
-  </div>
-  <!-- ── FOOTER ── -->
-  <div style="border-top:1px solid rgba(255,255,255,0.07);padding:10px 16px 14px;text-align:center;">
-    <a href="https://x.com/KeikoDevLCAI" target="_blank" rel="noopener" style="color:#9b7fe8;text-decoration:none;font-weight:600;font-size:13px;opacity:0.65;">𝕏 @KeikoDevLCAI</a>
-    <div style="margin-top:6px;font-size:13px;opacity:0.5;">Questions or ideas? <a href="#" onclick="(function(){navigator.clipboard.writeText('0xA3a653a8cBA0710ff57Ac34E2278C603B4259FD3').catch(function(){});window.open('https://orcamail.ai','_blank');var t=document.getElementById('_dctoast');if(t){t.style.display='block';setTimeout(function(){t.style.display='none'},3000);}})();return false;" style="color:#6c47ff;font-weight:600;text-decoration:none;">Contact Developer via OrcaMail &#x1F42C;</a></div>
-    <div style="margin-top:4px;font-size:13px;"><a href="https://orcamail.ai" target="_blank" style="color:#9b7fe8;text-decoration:none;opacity:0.8;">📢 Advertise with us</a></div>
-  </div>
+  <footer id="site-footer">
+    <div class="site-footer-pod">
+      <a href="https://keiko-dev-lcai.github.io/orcapod/" target="_blank" rel="noopener">🐬 Other Orca dApps →</a>
+    </div>
+    <div class="site-footer-links">
+      <a href="https://x.com/KeikoDevLCAI" target="_blank" rel="noopener" style="opacity:0.75;">𝕏 @KeikoDevLCAI</a>
+      <div style="margin-top:6px;font-size:13px;opacity:0.55;">Questions or ideas? <a href="#" onclick="(function(){navigator.clipboard.writeText('0xA3a653a8cBA0710ff57Ac34E2278C603B4259FD3').catch(function(){});window.open('https://orcamail.ai','_blank');var t=document.getElementById('_dctoast');if(t){t.style.display='block';setTimeout(function(){t.style.display='none'},3000);}})();return false;" style="color:#6c47ff;">Contact Developer via OrcaMail &#x1F42C;</a></div>
+      <div style="margin-top:4px;font-size:13px;opacity:0.8;"><a href="https://orcamail.ai" target="_blank" rel="noopener">📢 Advertise with us</a></div>
+    </div>
+  </footer>
 </div><!-- #main -->
 
 <!-- ── NFT DETAIL MODAL ── -->
