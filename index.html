@@ -217,6 +217,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .studio-tabs { display: flex; gap: 4px; background: var(--card); border-radius: var(--radius); padding: 4px; margin-bottom: 28px; }
 .studio-tab { flex: 1; padding: 9px; text-align: center; border-radius: var(--radius-sm); cursor: pointer; font-size: .88rem; font-weight: 600; color: var(--text2); transition: all .15s; }
 .studio-tab.active { background: var(--bg); color: var(--cyan); }
+.mint-steps { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+.mint-step { flex:1; min-width:120px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); font-size:.75rem; color:var(--text3); text-align:center; line-height:1.35; }
+.mint-step.active { border-color:var(--cyan); color:var(--cyan); background:rgba(0,229,255,.06); font-weight:700; }
+.mint-step.done { border-color:var(--green); color:var(--green); background:rgba(0,230,118,.08); }
+.upload-status-banner { display:none; background:rgba(255,215,64,.1); border:1px solid var(--yellow); border-radius:12px; padding:14px 16px; margin-bottom:16px; font-size:.88rem; color:var(--text2); line-height:1.55; }
+.upload-status-banner strong { color:var(--yellow); }
+.upload-status-banner.minted { background:rgba(0,230,118,.1); border-color:var(--green); }
+.upload-status-banner.minted strong { color:var(--green); }
 
 .upload-zone {
   border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px 24px;
@@ -659,12 +667,21 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 
         <!-- MINT FORM -->
         <div id="studio-mint">
+          <div class="mint-steps" id="mintSteps">
+            <div class="mint-step" id="mstep-upload">① Upload preview</div>
+            <div class="mint-step" id="mstep-details">② Name &amp; details</div>
+            <div class="mint-step" id="mstep-mint">③ Mint on-chain</div>
+            <div class="mint-step" id="mstep-list">④ List for sale</div>
+          </div>
           <div class="upload-zone" id="uploadZone" onclick="document.getElementById('artFile').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
             <div class="upload-icon">🖼️</div>
             <p>Drop your artwork here or <strong style="color:var(--cyan)">click to browse</strong></p>
-            <div class="upload-hint">PNG, JPG, GIF, MP4 · Stored permanently on Lightchain — no external service</div>
+            <div class="upload-hint">Preview only until you mint — uploading does <strong>not</strong> put art on-chain yet</div>
           </div>
           <img id="uploadPreview" class="upload-preview">
+          <div id="uploadStatusBanner" class="upload-status-banner">
+            <strong>⚠️ Not minted yet.</strong> This is only a preview in your browser. Fill in the details below, then click <strong>Mint NFT on Lightchain</strong> and approve the transaction in Trust Wallet.
+          </div>
           <input type="file" id="artFile" accept="image/*,video/mp4" style="display:none" onchange="handleFileSelect(event)">
 
           <div class="form-group">
@@ -963,8 +980,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   <div class="modal-box" style="max-width:420px">
     <button class="modal-close" onclick="document.getElementById('listModal').classList.remove('open')">✕</button>
     <div style="padding:28px">
-      <h3 style="font-size:1.2rem;font-weight:800;margin-bottom:6px;">List for Sale</h3>
-      <p style="color:var(--text3);font-size:.85rem;margin-bottom:8px;">Set a price in LCAI. Buyers can purchase immediately or make offers.</p>
+      <h3 style="font-size:1.2rem;font-weight:800;margin-bottom:6px;" id="listModalTitle">List for Sale</h3>
+      <p style="color:var(--text3);font-size:.85rem;margin-bottom:8px;" id="listModalSub">Set a price in LCAI. Buyers can purchase immediately or make offers.</p>
       <div style="font-size:.75rem;color:var(--cyan);margin-bottom:16px;">💡 Payment is in <strong>native LCAI</strong> on Lightchain mainnet — not ERC-20 LCAI on Ethereum</div>
       <div class="form-group">
         <label class="form-label">Sale Price (native LCAI)</label>
@@ -1984,7 +2001,7 @@ function showProfileTab(tab) {
   const myNFTs = profileNFTsForWallet();
   const myListed = myNFTs.filter(n => n.price && n.price !== '—' && parseFloat(n.price) > 0);
   if (tab === 'created') {
-    if (!myNFTs.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🎨</div><h3>No NFTs minted yet</h3><p>Head to Studio to mint your first NFT on Lightchain</p><button class="btn btn-primary" onclick="showPage('studio')">Go to Studio</button></div>`;
+    if (!myNFTs.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🎨</div><h3>No NFTs minted yet</h3><p>Uploading art in Studio is only a preview — you must click <strong>Mint NFT on Lightchain</strong> and approve in Trust Wallet to mint.</p><button class="btn btn-primary" onclick="showPage('studio')">Go to Studio</button></div>`;
     else { content.innerHTML = '<div class="nft-grid" id="profileNftGrid" style="padding:0"></div>'; renderNFTGrid('profileNftGrid', myNFTs); }
   } else if (tab === 'collected') {
     content.innerHTML = `<div class="empty-state"><div class="big-icon">🛍️</div><h3>No collected NFTs</h3><p>Browse the marketplace and buy your first NFT</p><button class="btn btn-primary" onclick="showPage('discover')">Browse Marketplace</button></div>`;
@@ -2094,10 +2111,21 @@ async function submitOffer() {
   document.getElementById('offerModal').classList.remove('open');
 }
 
-function openListModal(id) {
+function openListModal(id, afterMint) {
   document.getElementById('listModal').classList.add('open');
   document.getElementById('listModal').dataset.tokenId = id;
+  document.getElementById('listPrice').value = '';
   document.getElementById('listPrice').oninput = updateListPreview;
+  updateListPreview();
+  const title = document.getElementById('listModalTitle');
+  const sub = document.getElementById('listModalSub');
+  if (afterMint) {
+    if (title) title.textContent = '④ Set Your Listing Price';
+    if (sub) sub.textContent = 'Your NFT is minted on Lightchain. Set a price in LCAI to list it for sale — this is a separate step from minting.';
+  } else {
+    if (title) title.textContent = 'List for Sale';
+    if (sub) sub.textContent = 'Set a price in LCAI. Buyers can purchase immediately or make offers.';
+  }
 }
 
 function updateListPreview() {
@@ -2167,6 +2195,30 @@ function handleDrop(e) {
 function handleDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag'); }
 function handleDragLeave(e) { document.getElementById('uploadZone').classList.remove('drag'); }
 
+function updateMintSteps(active) {
+  const order = ['upload','details','mint','list'];
+  order.forEach((s, i) => {
+    const el = document.getElementById('mstep-' + s);
+    if (!el) return;
+    const idx = order.indexOf(active);
+    el.classList.toggle('active', s === active);
+    el.classList.toggle('done', i < idx);
+  });
+}
+function showUploadStatus(mode) {
+  const banner = document.getElementById('uploadStatusBanner');
+  if (!banner) return;
+  if (mode === 'hidden') { banner.style.display = 'none'; banner.classList.remove('minted'); return; }
+  banner.style.display = 'block';
+  banner.classList.toggle('minted', mode === 'minted');
+  if (mode === 'preview') {
+    banner.innerHTML = '<strong>⚠️ Not minted yet.</strong> This is only a preview in your browser. Fill in the details below, then click <strong>Mint NFT on Lightchain</strong> and approve the transaction in Trust Wallet.';
+    updateMintSteps('details');
+  } else if (mode === 'minted') {
+    banner.innerHTML = '<strong>✅ Minted on Lightchain!</strong> Your NFT is on-chain. Set a listing price in the next step so it appears for sale in the marketplace.';
+    updateMintSteps('list');
+  }
+}
 function previewFile(file, previewId, zoneId) {
   if (file.size > 50*1024*1024) { toast('File too large (max 50MB)', 'err'); return; }
   S.uploadedFile = file;
@@ -2176,6 +2228,7 @@ function previewFile(file, previewId, zoneId) {
     prev.src = ev.target.result;
     prev.style.display = 'block';
     document.getElementById(zoneId).style.display = 'none';
+    if (previewId === 'uploadPreview') showUploadStatus('preview');
   };
   reader.readAsDataURL(file);
 }
@@ -2281,6 +2334,13 @@ async function encodeImageForChain(file) {
   });
 }
 
+async function getNextMintTokenId() {
+  try {
+    const next = await readContractView('nextTokenId');
+    return next ? Number(next.toString()) : null;
+  } catch(e) { return null; }
+}
+
 async function mintNFT() {
   if (!S.wallet) { toast('Connect wallet first', 'err'); return; }
   const name = document.getElementById('mintName').value.trim();
@@ -2295,9 +2355,11 @@ async function mintNFT() {
 
   const btn = document.querySelector('#studio-mint .btn-primary');
   btn.disabled = true;
+  updateMintSteps('mint');
   btn.textContent = '⏳ Encoding image for Lightchain…';
 
   try {
+    const nextBefore = await getNextMintTokenId();
     const imageURI = await encodeImageForChain(S.uploadedFile);
     const metadata = {
       name, description: desc,
@@ -2316,12 +2378,22 @@ async function mintNFT() {
     btn.textContent = '⏳ Minting on Lightchain…';
     const result = await sendTx('mint', [toAddr, tokenURI, royaltyBps, collectionId, S.selectedOrigin], '0');
     if (result !== null) {
-      toast('🎉 NFT minted successfully!', 'ok', 5000);
-      addNotification('✨', 'NFT Minted!', `"${name}" was successfully minted on Lightchain.`);
-      resetMintForm();
+      let tokenId = null;
+      const nextAfter = await getNextMintTokenId();
+      if (nextBefore != null && nextAfter != null && nextAfter > nextBefore) tokenId = nextAfter - 1;
+      toast('🎉 NFT minted on Lightchain! Now set your price.', 'ok', 6000);
+      addNotification('✨', 'NFT Minted!', `"${name}" is on-chain${tokenId != null ? ' as #' + tokenId : ''}. Set a listing price next.`);
+      showUploadStatus('minted');
       await loadRealNFTs();
       showPage('profile');
       showProfileTab('created');
+      if (tokenId != null) {
+        setTimeout(function() {
+          openListModal(tokenId, true);
+          document.getElementById('listPrice')?.focus();
+        }, 400);
+      }
+      resetMintForm();
     }
   } catch(e) {
     toast('Mint failed: ' + (e.message||e), 'err');
@@ -2340,6 +2412,8 @@ function resetMintForm() {
   document.getElementById('uploadZone').style.display = '';
   S.uploadedFile = null;
   selectOrigin(0);
+  showUploadStatus('hidden');
+  updateMintSteps('upload');
 }
 
 async function createCollection() {
