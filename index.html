@@ -352,12 +352,25 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .toast.info { background: #1a1a2e; color: var(--cyan); border: 1px solid var(--cyan); }
 @keyframes toastIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
-/* ── ACTIVITY TABLE ── */
+/* ── ACTIVITY PAGE ── */
+#sec-activity.active { max-width: 1280px; }
+#sec-activity .activity-header { padding: 36px 32px 24px; }
+#sec-activity .sec-title { font-size: 1.65rem; }
+#sec-activity .activity-sub { color: var(--text3); font-size: 1rem; line-height: 1.5; }
+.activity-panel {
+  margin: 0 32px 40px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  min-height: 320px;
+}
 .activity-table { width: 100%; border-collapse: collapse; }
-.activity-table th { text-align: left; padding: 10px 16px; color: var(--text3); font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
-.activity-table td { padding: 12px 16px; border-bottom: 1px solid rgba(42,42,74,.4); font-size: .85rem; vertical-align: middle; }
+.activity-table th { text-align: left; padding: 18px 24px; color: var(--text3); font-size: .82rem; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+.activity-table td { padding: 20px 24px; border-bottom: 1px solid rgba(42,42,74,.4); font-size: 1rem; vertical-align: middle; }
+.activity-table td strong { font-size: 1.08rem; }
 .activity-table tr:hover td { background: var(--card2); }
-.event-badge { padding: 3px 8px; border-radius: 10px; font-size: .72rem; font-weight: 700; }
+.event-badge { padding: 5px 12px; border-radius: 12px; font-size: .82rem; font-weight: 700; }
 .ev-mint { background: rgba(0,230,118,.15); color: var(--green); }
 .ev-sale { background: rgba(0,229,255,.15); color: var(--cyan); }
 .ev-list { background: rgba(124,77,255,.15); color: #b39ddb; }
@@ -777,11 +790,11 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 
     <!-- ── ACTIVITY ── -->
     <div id="sec-activity" class="page-section">
-      <div style="padding:28px 24px 20px;">
-        <div class="sec-title" style="margin-bottom:4px;"><span class="dot"></span> Global Activity</div>
-        <p style="color:var(--text3);font-size:.85rem;">Live mints, sales, and offers across OrcaMint</p>
+      <div class="activity-header">
+        <div class="sec-title" style="margin-bottom:8px;"><span class="dot"></span> Global Activity</div>
+        <p class="activity-sub" id="activitySub">Live mints, sales, and offers across OrcaMint</p>
       </div>
-      <div style="padding:0 24px 32px;overflow-x:auto;">
+      <div class="activity-panel" style="overflow-x:auto;">
         <table class="activity-table" id="activityTable">
           <thead>
             <tr>
@@ -1719,13 +1732,22 @@ function renderDrops() {
 
 function renderActivity() {
   const tbody = document.getElementById('activityBody');
+  const sub = document.getElementById('activitySub');
   if (!tbody) return;
   const evClass = { Mint:'ev-mint', Sale:'ev-sale', List:'ev-list', Offer:'ev-offer' };
-  tbody.innerHTML = DEMO_ACTIVITY.map(a => `
+  const realActivity = buildRealActivity();
+  const usingDemo = realActivity.length === 0;
+  const activity = usingDemo ? DEMO_ACTIVITY : realActivity;
+  if (sub) {
+    sub.textContent = usingDemo
+      ? 'Sample activity shown until real on-chain events exist.'
+      : 'Live on-chain mints and listings on Lightchain.';
+  }
+  tbody.innerHTML = activity.map(a => `
     <tr>
       <td><span class="event-badge ${evClass[a.event]||''}">${a.event}</span></td>
       <td><strong>${a.item}</strong></td>
-      <td>${a.price} LCAI</td>
+      <td>${a.price}${String(a.price).toLowerCase() === 'free' ? '' : ' LCAI'}</td>
       <td class="addr-short">${a.from}</td>
       <td class="addr-short">${a.to}</td>
       <td class="text-muted">${timeAgo(a.time)}</td>
@@ -1753,6 +1775,28 @@ function refreshNFTViews() {
   renderDiscover();
   updateProfileStats();
   if (S.currentPage === 'profile') renderProfile();
+  if (S.currentPage === 'activity') renderActivity();
+}
+
+function buildRealActivity() {
+  if (!realNFTs.length) return [];
+  const rows = [];
+  realNFTs.forEach((n, i) => {
+    const who = shortAddr(n.creator);
+    rows.push({
+      event: 'Mint', item: n.name, price: 'Free',
+      from: who, to: who,
+      time: Date.now() - (realNFTs.length - i) * 600000 - 3600000
+    });
+    if (n.price && n.price !== '—' && parseFloat(n.price) > 0) {
+      rows.push({
+        event: 'List', item: n.name, price: formatLcaiAmount(parseFloat(n.price)),
+        from: who, to: '—',
+        time: Date.now() - (realNFTs.length - i) * 600000
+      });
+    }
+  });
+  return rows.sort((a, b) => b.time - a.time);
 }
 
 function renderProfile() {
