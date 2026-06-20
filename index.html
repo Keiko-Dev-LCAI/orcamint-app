@@ -87,6 +87,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 #searchBox::placeholder { color: var(--text3); }
 #searchBox:focus { border-color: var(--cyan); }
 .topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.topbar-wallet-badge { display:none; align-items:center; gap:6px; background:rgba(0,230,118,.12); border:1px solid rgba(0,230,118,.35); color:var(--green); border-radius:999px; padding:5px 12px; font-size:.78rem; font-weight:700; font-family:monospace; white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.topbar-wallet-badge.show { display:inline-flex; }
 .icon-btn {
   width: 36px; height: 36px; border-radius: 50%; background: var(--card);
   border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
@@ -593,6 +595,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   <div id="topbar">
     <input id="searchBox" type="text" placeholder="Search NFTs, collections, addresses…" onkeyup="handleSearch(event)">
     <div class="topbar-actions">
+      <span id="topbarWalletBadge" class="topbar-wallet-badge" onclick="disconnectWallet()" title="Connected — tap to disconnect"></span>
       <div class="icon-btn" onclick="toggleNotifs()" title="Notifications">
         🔔
         <span class="notif-dot" id="notifDot" style="display:none"></span>
@@ -1111,7 +1114,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 const CHAIN_ID       = 9200;
 const CONTRACT_ADDR  = '0xe7bD4500277f6167B6b454CF2CF529c062B4Ca1a';
 const PLATFORM_WALLET= '0x1F899FaD2C8BD70b6eF356ae6cC3c0abDbB15EB5';
-const AIVM_CHAT_URL  = 'https://web-production-0ccfe.up.railway.app/api/chat';
+const AIVM_RELAY     = 'https://web-production-aaaba.up.railway.app';
 // Images stored directly on Lightchain — no external service needed
 
 // ── MODERATION CONSTANTS ──
@@ -1500,11 +1503,12 @@ async function connectViaWalletConnect() {
 
 function onWalletConnected() {
   const addr = S.wallet;
+  const badge = document.getElementById('topbarWalletBadge');
+  if (badge) { badge.textContent = '✓ ' + shortAddr(addr); badge.classList.add('show'); }
   document.getElementById('walletBtnIcon').textContent = '✅';
   document.getElementById('walletBtnText').textContent = shortAddr(addr);
-  document.getElementById('walletAddr').textContent = 'Tap to disconnect';
-  document.getElementById('walletAddr').style.cursor = 'pointer';
-  document.getElementById('walletAddr').onclick = disconnectWallet;
+  const wa = document.getElementById('walletAddr');
+  if (wa) { wa.textContent = ''; wa.style.display = 'none'; }
   document.getElementById('walletBtn').onclick = disconnectWallet;
   const mwb = document.getElementById('mobileWalletBtnText');
   if (mwb) mwb.textContent = '✅';
@@ -1530,6 +1534,10 @@ function disconnectWallet() {
   S.wallet = null;
   activeProvider = null;
   if (_wcProv) { try { _wcProv.disconnect(); } catch {} _wcProv = null; }
+  const badge = document.getElementById('topbarWalletBadge');
+  if (badge) { badge.textContent = ''; badge.classList.remove('show'); }
+  const wa = document.getElementById('walletAddr');
+  if (wa) wa.style.display = '';
   document.getElementById('walletBtnIcon').textContent = '🔗';
   document.getElementById('walletBtnText').textContent = 'Connect Wallet';
   document.getElementById('walletAddr').textContent = '';
@@ -2476,26 +2484,32 @@ function mintFromDrop(dropId) {
   toast('Select the collection in Studio to mint into this drop', 'info', 4000);
 }
 
-// ── AIVM ──
+// ── AIVM (OrcaAppBuilder relay → official Lightchain gateway) ──
 async function aivmCall(prompt) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 120000);
-  try {
-    const res = await fetch(AIVM_CHAT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
-      signal: controller.signal
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'AIVM error ' + res.status);
-    }
-    const data = await res.json();
-    return data.reply || data.choices?.[0]?.message?.content || data.content || data.result || '';
-  } finally {
-    clearTimeout(timer);
+  const res = await fetch(AIVM_RELAY + '/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: prompt, mode: 'chat' })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'AIVM error ' + res.status);
   }
+  const start = await res.json();
+  const jobId = start.job_id;
+  if (!jobId) {
+    return start.reply || start.choices?.[0]?.message?.content || start.content || start.result || '';
+  }
+  const deadline = Date.now() + 150000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 5000));
+    const poll = await fetch(AIVM_RELAY + '/api/chat/status?job_id=' + encodeURIComponent(jobId));
+    if (!poll.ok) throw new Error('Poll error ' + poll.status);
+    const d = await poll.json();
+    if (d.status === 'done') return d.reply || '';
+    if (d.status === 'error') throw new Error(d.error || 'AIVM failed');
+  }
+  throw new Error('AIVM took too long (150s)');
 }
 
 async function aivmGenerateDesc() {
