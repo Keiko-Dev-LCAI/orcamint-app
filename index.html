@@ -161,6 +161,11 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .nft-footer { display: flex; align-items: center; justify-content: space-between; }
 .nft-price { font-size: .82rem; color: var(--text2); }
 .nft-price strong { color: var(--text); font-size: .9rem; }
+.nft-status-badge { position:absolute; top:10px; left:10px; z-index:4; font-size:.68rem; font-weight:700; padding:4px 8px; border-radius:6px; letter-spacing:.02em; }
+.nft-status-minted { background:rgba(0,230,118,.18); color:var(--green); border:1px solid rgba(0,230,118,.35); }
+.nft-status-listed { background:rgba(0,229,255,.15); color:var(--cyan); border:1px solid rgba(0,229,255,.35); }
+.nft-status-unlisted { background:rgba(255,215,64,.12); color:var(--yellow); border:1px solid rgba(255,215,64,.35); }
+.nft-token-id { font-size:.7rem; color:var(--text3); margin-top:2px; }
 .nft-origin { font-size: .65rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
 .origin-0 { background: rgba(124,77,255,.2); color: #b39ddb; } /* Artist Upload */
 .origin-1 { background: rgba(0,229,255,.15); color: var(--cyan); } /* AIVM Enhanced */
@@ -1663,11 +1668,19 @@ function renderGallery() {
   renderNFTGrid('featuredGrid', visible, true);
 }
 
+function nftDisplayStatus(n) {
+  const listed = n.price && n.price !== '—' && parseFloat(n.price) > 0;
+  if (listed) return { priceHtml: '<strong>' + n.price + ' LCAI</strong>', badge: '<span class="nft-status-badge nft-status-listed">For Sale</span>', sub: '' };
+  if (n.real) return { priceHtml: '<span style="color:var(--yellow);font-weight:700">Not listed</span>', badge: '<span class="nft-status-badge nft-status-minted">✓ Minted</span>', sub: '<div class="nft-token-id">#' + n.id + ' on Lightchain</div>' };
+  return { priceHtml: '<strong>' + (n.price || '—') + ' LCAI</strong>', badge: '', sub: '' };
+}
+
 function renderNFTGrid(containerId, nfts, adminButtons = false) {
   const el = document.getElementById(containerId);
   if (!el) return;
   if (!nfts.length) { el.innerHTML = '<div class="empty-state"><div class="big-icon">🖼️</div><h3>No NFTs yet</h3><p>Be the first to mint on Lightchain!</p><button class="btn btn-primary" onclick="showPage(\'studio\')">Mint Now</button></div>'; return; }
   el.innerHTML = nfts.map(n => {
+    const st = nftDisplayStatus(n);
     const showAdmin = adminButtons && isAdmin();
     const creatorSafe = (n.creator||'').replace(/'/g,'');
     const adminHtml = showAdmin ? `
@@ -1681,14 +1694,16 @@ function renderNFTGrid(containerId, nfts, adminButtons = false) {
       </div>` : '';
     return `
     <div class="nft-card" onclick="openNftModal(${n.id})" style="position:relative;">
+      ${st.badge}
       ${adminHtml}
       <div class="nft-img">${n.image ? `<img src="${n.image}" alt="${n.name}" loading="lazy">` : `<span style="font-size:3.5rem">${n.emoji||'🖼️'}</span>`}</div>
       <span class="nft-like" onclick="event.stopPropagation();likeNFT(${n.id})">♡</span>
       <div class="nft-info">
         <div class="nft-name">${n.name}</div>
         ${n.collection ? `<div class="nft-collection">${n.collection}</div>` : ''}
+        ${st.sub}
         <div class="nft-footer">
-          <div class="nft-price"><strong>${n.price||'—'} LCAI</strong></div>
+          <div class="nft-price">${st.priceHtml}</div>
           <button onclick="event.stopPropagation();shareNFTToLightChat(${JSON.stringify(n.name)},${JSON.stringify(n.collection||'')})" style="background:rgba(155,127,232,0.12);border:1px solid rgba(155,127,232,0.35);color:#9b7fe8;border-radius:6px;padding:4px 10px;font-size:.72rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🔗 Share</button>
         </div>
       </div>
@@ -2030,6 +2045,12 @@ function openNftModal(id) {
   imgEl.innerHTML = nft.image ? `<img src="${nft.image}" alt="${nft.name}">` : `<span style="font-size:6rem">${nft.emoji||'🖼️'}</span>`;
   const isOwner = S.wallet && nft.creator && nft.creator.toLowerCase() === S.wallet.toLowerCase();
   const isListed = nft.price && nft.price !== '—' && parseFloat(nft.price) > 0;
+  const isMinted = !!nft.real;
+  const statusLine = isListed
+    ? '<span style="color:var(--cyan);font-weight:700">✓ Minted · For sale</span>'
+    : isMinted
+      ? '<span style="color:var(--green);font-weight:700">✓ Minted on Lightchain</span> · <span style="color:var(--yellow)">Not listed for sale</span>'
+      : '';
   const actionsHtml = isOwner
     ? `<div class="detail-actions">
         <button class="btn btn-primary" onclick="openListModal(${nft.id})">🏷️ ${isListed ? 'Change Price' : 'List for Sale'}</button>
@@ -2047,12 +2068,13 @@ function openNftModal(id) {
   document.getElementById('nftModalInfo').innerHTML = `
     <div class="nft-detail-collection" onclick="openCollection(1)">${nft.collection||'Standalone NFT'}</div>
     <div class="nft-detail-name">${nft.name}</div>
+    ${statusLine ? '<div style="font-size:.84rem;margin:6px 0 10px;line-height:1.5">'+statusLine+'</div>' : ''}
     <div class="nft-detail-origin">${originLabel(nft.origin)}</div>
     <div class="owner-row"><div class="owner-avatar">${nft.creator.slice(2,4)}</div><span>Owned by</span><strong>${nft.creator}</strong></div>
     <div class="price-box">
-      <div class="lbl">Current price</div>
-      <div class="price">${isListed ? nft.price + ' <span>LCAI</span>' : '<span style="font-size:1rem;color:var(--text3)">Not listed</span>'}</div>
-      ${isListed ? `<div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Native LCAI &middot; Lightchain mainnet</div>` : ''}
+      <div class="lbl">${isListed ? 'Current price' : 'Listing status'}</div>
+      <div class="price">${isListed ? nft.price + ' <span>LCAI</span>' : '<span style="font-size:1rem;color:var(--yellow)">Not listed</span>'}</div>
+      ${isListed ? `<div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Native LCAI &middot; Lightchain mainnet</div>` : isMinted ? `<div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Minted on-chain · set a price to list for sale</div>` : ''}
     </div>
     ${actionsHtml}
     <div class="detail-section">
