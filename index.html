@@ -1839,10 +1839,20 @@ function saveProfileAvatar(dataUrl) {
   catch(e) { toast('Could not save photo — try a smaller image.', 'err'); }
 }
 
+function nftProfileImage(n) {
+  if (!n) return null;
+  // Hosted copy of on-chain mint artwork (faster than huge data: URIs in img src)
+  if (String(n.id) === '1' && (n.name || '').toLowerCase() === 'keiko') return 'keiko-minted.jpg';
+  return n.image || null;
+}
+
 function defaultProfileAvatarFromNFTs() {
   const mine = profileNFTsForWallet();
-  const withImg = mine.find(n => n.image);
-  return withImg ? withImg.image : 'orca-icon.png';
+  for (const n of mine) {
+    const src = nftProfileImage(n);
+    if (src) return src;
+  }
+  return 'orca-icon.png';
 }
 
 function renderProfileAvatar(el) {
