@@ -1716,6 +1716,28 @@ function renderActivity() {
 }
 
 // ── PROFILE ──
+function profileNFTsForWallet() {
+  const allNFTList = realNFTs.length > 0 ? realNFTs : DEMO_NFTS;
+  if (!S.wallet) return [];
+  const w = S.wallet.toLowerCase();
+  return allNFTList.filter(n => n.creator && n.creator.toLowerCase() === w);
+}
+
+function updateProfileStats() {
+  const myNFTs = profileNFTsForWallet();
+  const listed = myNFTs.filter(n => n.price && n.price !== '—' && parseFloat(n.price) > 0);
+  const createdEl = document.getElementById('pStatCreated');
+  const listingsEl = document.getElementById('pStatListings');
+  if (createdEl) createdEl.textContent = String(myNFTs.length);
+  if (listingsEl) listingsEl.textContent = String(listed.length);
+}
+
+function refreshNFTViews() {
+  renderDiscover();
+  updateProfileStats();
+  if (S.currentPage === 'profile') renderProfile();
+}
+
 function renderProfile() {
   const name = document.getElementById('profileName');
   const addrEl = document.getElementById('profileAddrEl');
@@ -1741,6 +1763,7 @@ function renderProfile() {
   const hue = parseInt(S.wallet.slice(2,6),16) % 360;
   avatar.style.background = `hsl(${hue},60%,25%)`;
   avatar.textContent = S.wallet.slice(2,4).toUpperCase();
+  updateProfileStats();
   showProfileTab(S.currentProfileTab);
 }
 
@@ -1751,17 +1774,22 @@ function showProfileTab(tab) {
     t.classList.toggle('active', tabs[i]===tab);
   });
   const content = document.getElementById('profileContent');
-  const allNFTList = realNFTs.length > 0 ? realNFTs : DEMO_NFTS;
-  const myNFTs = allNFTList.filter(n => S.wallet && n.creator && n.creator.toLowerCase() === S.wallet.toLowerCase());
+  const myNFTs = profileNFTsForWallet();
+  const myListed = myNFTs.filter(n => n.price && n.price !== '—' && parseFloat(n.price) > 0);
   if (tab === 'created') {
     if (!myNFTs.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🎨</div><h3>No NFTs minted yet</h3><p>Head to Studio to mint your first NFT on Lightchain</p><button class="btn btn-primary" onclick="showPage('studio')">Go to Studio</button></div>`;
     else { content.innerHTML = '<div class="nft-grid" id="profileNftGrid" style="padding:0"></div>'; renderNFTGrid('profileNftGrid', myNFTs); }
   } else if (tab === 'collected') {
     content.innerHTML = `<div class="empty-state"><div class="big-icon">🛍️</div><h3>No collected NFTs</h3><p>Browse the marketplace and buy your first NFT</p><button class="btn btn-primary" onclick="showPage('discover')">Browse Marketplace</button></div>`;
   } else if (tab === 'listings') {
-    content.innerHTML = `<div class="empty-state"><div class="big-icon">🏷️</div><h3>No active listings</h3><p>List your NFTs for sale from their detail page</p></div>`;
+    if (!myListed.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🏷️</div><h3>No active listings</h3><p>List your NFTs for sale from their detail page</p></div>`;
+    else { content.innerHTML = '<div class="nft-grid" id="profileListGrid" style="padding:0"></div>'; renderNFTGrid('profileListGrid', myListed); }
   } else if (tab === 'activity') {
-    content.innerHTML = `<div style="overflow-x:auto"><table class="activity-table"><thead><tr><th>Event</th><th>Item</th><th>Price</th><th>Time</th></tr></thead><tbody>${DEMO_ACTIVITY.slice(0,3).map(a=>`<tr><td><span class="event-badge ${a.event==='Mint'?'ev-mint':'ev-sale'}">${a.event}</span></td><td>${a.item}</td><td>${a.price} LCAI</td><td class="text-muted">${timeAgo(a.time)}</td></tr>`).join('')}</tbody></table></div>`;
+    const activityRows = (realNFTs.length > 0 ? myNFTs : []).map(n =>
+      `<tr><td><span class="event-badge ev-mint">Mint</span></td><td>${n.name}</td><td>Free</td><td class="text-muted">Just now</td></tr>`
+    );
+    const fallback = DEMO_ACTIVITY.slice(0,3).map(a=>`<tr><td><span class="event-badge ${a.event==='Mint'?'ev-mint':'ev-sale'}">${a.event}</span></td><td>${a.item}</td><td>${a.price} LCAI</td><td class="text-muted">${timeAgo(a.time)}</td></tr>`).join('');
+    content.innerHTML = `<div style="overflow-x:auto"><table class="activity-table"><thead><tr><th>Event</th><th>Item</th><th>Price</th><th>Time</th></tr></thead><tbody>${activityRows.length ? activityRows.join('') : fallback}</tbody></table></div>`;
   }
 }
 
@@ -1883,7 +1911,7 @@ async function submitListing() {
   if (receipt) {
     document.getElementById('listModal').classList.remove('open');
     toast('NFT listed for sale!', 'ok', 4000);
-    setTimeout(loadRealNFTs, 2000);
+    setTimeout(() => loadRealNFTs().then(() => showPage('profile')), 2000);
   }
 }
 
@@ -2079,6 +2107,9 @@ async function mintNFT() {
       toast('🎉 NFT minted successfully!', 'ok', 5000);
       addNotification('✨', 'NFT Minted!', `"${name}" was successfully minted on Lightchain.`);
       resetMintForm();
+      await loadRealNFTs();
+      showPage('profile');
+      showProfileTab('created');
     }
   } catch(e) {
     toast('Mint failed: ' + (e.message||e), 'err');
@@ -2305,7 +2336,7 @@ async function loadRealNFTs() {
       .map(r => r.value);
     if (loaded.length > 0) {
       realNFTs = loaded;
-      renderGallery();
+      refreshNFTViews();
     }
   } catch(e) {
     console.warn('Could not load real NFTs:', e);
