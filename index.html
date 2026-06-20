@@ -1546,13 +1546,19 @@ async function sendTx(method, params, valueEth) {
   }
   try {
     const provider = new ethers.providers.Web3Provider(activeProvider || window.ethereum);
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== CHAIN_ID) {
+      toast('Switch wallet to Lightchain (9200). Gas and payments are native LCAI — not Ethereum.', 'err', 6000);
+      return null;
+    }
     const signer = provider.getSigner();
     const contract = new ethers.Contract(CONTRACT_ADDR, ABI, signer);
     const valFloat = valueEth ? parseFloat(valueEth) : 0;
+    // parseEther = 18-decimal native coin units (LCAI on Lightchain, not ETH)
     const value = valFloat > 0
       ? ethers.utils.parseEther(valFloat.toFixed(9))
       : ethers.BigNumber.from(0);
-    toast('Confirm in your wallet…', 'info');
+    toast('Confirm in MetaMask (Lightchain · native LCAI gas)…', 'info');
     const tx = await contract[method](...params, { value });
     toast('⏳ Confirming on Lightchain…', 'info', 20000);
     const receipt = await tx.wait();
