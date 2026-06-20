@@ -382,24 +382,31 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 @keyframes toastIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ── ACTIVITY PAGE ── */
-#sec-activity.active { max-width: 1280px; }
-#sec-activity .activity-header { padding: 36px 32px 24px; }
+#sec-activity.active {
+  max-width: none; width: 100%; min-height: calc(100vh - 60px - 108px);
+  display: flex; flex-direction: column; box-sizing: border-box;
+}
+#sec-activity .activity-header { padding: 28px 32px 18px; flex-shrink: 0; }
 #sec-activity .sec-title { font-size: 1.65rem; }
 #sec-activity .activity-sub { color: var(--text3); font-size: 1rem; line-height: 1.5; }
+#sec-activity .activity-body-wrap { flex: 1; display: flex; flex-direction: column; padding: 0 32px 20px; min-height: 0; }
 .activity-panel {
-  margin: 0 32px 40px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  min-height: 320px;
+  flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; min-height: 420px; display: flex; flex-direction: column;
+}
+.activity-panel-scroll { flex: 1; overflow: auto; }
+.activity-panel-note {
+  padding: 18px 24px; border-top: 1px solid var(--border); color: var(--text3);
+  font-size: .92rem; text-align: center; background: rgba(0,0,0,.12);
 }
 .activity-table { width: 100%; border-collapse: collapse; }
-.activity-table th { text-align: left; padding: 18px 24px; color: var(--text3); font-size: .82rem; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
-.activity-table td { padding: 20px 24px; border-bottom: 1px solid rgba(42,42,74,.4); font-size: 1rem; vertical-align: middle; }
-.activity-table td strong { font-size: 1.08rem; }
+.activity-table th { text-align: left; padding: 20px 24px; color: var(--text3); font-size: .85rem; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+.activity-table td { padding: 22px 24px; border-bottom: 1px solid rgba(42,42,74,.4); font-size: 1.05rem; vertical-align: middle; }
+.activity-table td strong { font-size: 1.12rem; }
 .activity-table tr:hover td { background: var(--card2); }
-.event-badge { padding: 5px 12px; border-radius: 12px; font-size: .82rem; font-weight: 700; }
+.activity-item-cell { display: flex; align-items: center; gap: 14px; }
+.activity-item-cell img { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; border: 1px solid var(--border); flex-shrink: 0; }
+.event-badge { padding: 6px 14px; border-radius: 12px; font-size: .85rem; font-weight: 700; }
 .ev-mint { background: rgba(0,230,118,.15); color: var(--green); }
 .ev-sale { background: rgba(0,229,255,.15); color: var(--cyan); }
 .ev-list { background: rgba(124,77,255,.15); color: #b39ddb; }
@@ -830,20 +837,25 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
         <div class="sec-title" style="margin-bottom:8px;"><span class="dot"></span> Global Activity</div>
         <p class="activity-sub" id="activitySub">Live mints, sales, and offers across OrcaMint</p>
       </div>
-      <div class="activity-panel" style="overflow-x:auto;">
-        <table class="activity-table" id="activityTable">
-          <thead>
-            <tr>
-              <th>Event</th>
-              <th>Item</th>
-              <th>Price</th>
-              <th>From</th>
-              <th>To</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody id="activityBody"></tbody>
-        </table>
+      <div class="activity-body-wrap">
+        <div class="activity-panel">
+          <div class="activity-panel-scroll">
+            <table class="activity-table" id="activityTable">
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Item</th>
+                  <th>Price</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="activityBody"></tbody>
+            </table>
+          </div>
+          <div class="activity-panel-note" id="activityPanelNote"></div>
+        </div>
       </div>
     </div>
 
@@ -1766,9 +1778,20 @@ function renderDrops() {
   renderDropsGrid('allDropsGrid', DEMO_DROPS);
 }
 
+function activityItemCell(name) {
+  const label = name || '—';
+  const nft = realNFTs.find(n => (n.name || '').toLowerCase() === String(label).toLowerCase());
+  const img = nft ? (nftProfileImage(nft) || '') : (label.toLowerCase() === 'keiko' ? 'keiko-minted.jpg' : '');
+  if (img) {
+    return `<div class="activity-item-cell"><img src="${img}" alt="${label}"><strong>${label}</strong></div>`;
+  }
+  return `<strong>${label}</strong>`;
+}
+
 function renderActivity() {
   const tbody = document.getElementById('activityBody');
   const sub = document.getElementById('activitySub');
+  const note = document.getElementById('activityPanelNote');
   if (!tbody) return;
   const evClass = { Mint:'ev-mint', Sale:'ev-sale', List:'ev-list', Offer:'ev-offer' };
   const realActivity = buildRealActivity();
@@ -1779,10 +1802,15 @@ function renderActivity() {
       ? 'Sample activity shown until real on-chain events exist.'
       : 'Live on-chain mints and listings on Lightchain.';
   }
+  if (note) {
+    note.textContent = usingDemo
+      ? 'Demo rows only — your real mints and sales will show here.'
+      : `${activity.length} on-chain event${activity.length === 1 ? '' : 's'} so far. More appear as OrcaMint grows.`;
+  }
   tbody.innerHTML = activity.map(a => `
     <tr>
       <td><span class="event-badge ${evClass[a.event]||''}">${a.event}</span></td>
-      <td><strong>${a.item}</strong></td>
+      <td>${activityItemCell(a.item)}</td>
       <td>${a.price}${String(a.price).toLowerCase() === 'free' ? '' : ' LCAI'}</td>
       <td class="addr-short">${a.from}</td>
       <td class="addr-short">${a.to}</td>
