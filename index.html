@@ -1111,7 +1111,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 const CHAIN_ID       = 9200;
 const CONTRACT_ADDR  = '0xe7bD4500277f6167B6b454CF2CF529c062B4Ca1a';
 const PLATFORM_WALLET= '0x1F899FaD2C8BD70b6eF356ae6cC3c0abDbB15EB5';
-const AIVM_GATEWAY   = 'https://web-production-0ccfe.up.railway.app/api/aivm';
+const AIVM_CHAT_URL  = 'https://web-production-0ccfe.up.railway.app/api/chat';
 // Images stored directly on Lightchain — no external service needed
 
 // ── MODERATION CONSTANTS ──
@@ -1264,9 +1264,16 @@ function timeAgo(ts) {
   return Math.floor(s/86400) + 'd ago';
 }
 function originLabel(o) {
-  const labels = ['🎨 Artist Upload','⚡ AIVM Enhanced','🤖 AIVM Generated'];
+  const labels = ['🎨 Art source: uploaded by artist','⚡ Art source: AIVM enhanced','🤖 Art source: AIVM generated'];
   const classes = ['origin-0','origin-1','origin-2'];
-  return `<span class="nft-origin ${classes[o]||'origin-0'}">${labels[o]||'Unknown'}</span>`;
+  return `<span class="nft-origin ${classes[o]||'origin-0'}" title="How the artwork was created — not the same as mint status">${labels[o]||'Unknown'}</span>`;
+}
+function nftMintStatusBanner(nft, isListed) {
+  if (!nft.real) return '';
+  if (isListed) {
+    return `<div class="nft-mint-status-banner listed"><span class="mint-status-title">✓ Minted on Lightchain · For sale</span><span class="mint-status-sub">Token #${nft.id} · listed at ${nft.price} LCAI</span></div>`;
+  }
+  return `<div class="nft-mint-status-banner minted"><span class="mint-status-title">✓ Minted on Lightchain</span><span class="mint-status-sub">Token #${nft.id} · on-chain and owned · <strong style="color:var(--yellow)">not listed for sale yet</strong></span></div>`;
 }
 function toast(msg, type='info', dur=3200) {
   const z = document.getElementById('toastZone');
@@ -2051,11 +2058,7 @@ function openNftModal(id) {
   const isOwner = S.wallet && nft.creator && nft.creator.toLowerCase() === S.wallet.toLowerCase();
   const isListed = nft.price && nft.price !== '—' && parseFloat(nft.price) > 0;
   const isMinted = !!nft.real;
-  const statusLine = isListed
-    ? '<span style="color:var(--cyan);font-weight:700">✓ Minted · For sale</span>'
-    : isMinted
-      ? '<span style="color:var(--green);font-weight:700">✓ Minted on Lightchain</span> · <span style="color:var(--yellow)">Not listed for sale</span>'
-      : '';
+  const mintBanner = nftMintStatusBanner(nft, isListed);
   const actionsHtml = isOwner
     ? `<div class="detail-actions">
         <button class="btn btn-primary" onclick="openListModal(${nft.id})">🏷️ ${isListed ? 'Change Price' : 'List for Sale'}</button>
@@ -2066,14 +2069,19 @@ function openNftModal(id) {
           <button class="btn btn-primary" onclick="buyNFT(${nft.id})">Buy Now</button>
           <button class="btn btn-outline" onclick="openOfferModal(${nft.id})">Make Offer</button>
         </div>`
-      : `<div class="detail-actions">
-          <button class="btn btn-outline" onclick="openOfferModal(${nft.id})">Make Offer</button>
-        </div>
-        <div style="text-align:center;color:var(--text3);font-size:.82rem;margin-top:6px;">Not listed for sale</div>`;
+      : isMinted
+        ? `<div class="detail-actions">
+            <button class="btn btn-outline" onclick="openOfferModal(${nft.id})">Make Offer</button>
+          </div>
+          <div style="text-align:center;color:var(--text3);font-size:.82rem;margin-top:6px;">Minted but not listed — owner can set a price to sell</div>`
+        : `<div class="detail-actions">
+            <button class="btn btn-outline" onclick="openOfferModal(${nft.id})">Make Offer</button>
+          </div>
+          <div style="text-align:center;color:var(--text3);font-size:.82rem;margin-top:6px;">Not listed for sale</div>`;
   document.getElementById('nftModalInfo').innerHTML = `
     <div class="nft-detail-collection" onclick="openCollection(1)">${nft.collection||'Standalone NFT'}</div>
     <div class="nft-detail-name">${nft.name}</div>
-    ${statusLine ? '<div style="font-size:.84rem;margin:6px 0 10px;line-height:1.5">'+statusLine+'</div>' : ''}
+    ${mintBanner}
     <div class="nft-detail-origin">${originLabel(nft.origin)}</div>
     <div class="owner-row"><div class="owner-avatar">${nft.creator.slice(2,4)}</div><span>Owned by</span><strong>${nft.creator}</strong></div>
     <div class="price-box">
@@ -2471,17 +2479,20 @@ function mintFromDrop(dropId) {
 // ── AIVM ──
 async function aivmCall(prompt) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90000);
+  const timer = setTimeout(() => controller.abort(), 120000);
   try {
-    const res = await fetch(AIVM_GATEWAY, {
+    const res = await fetch(AIVM_CHAT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'lightchain-aivm', messages: [{ role:'user', content: prompt }], max_tokens: 200 }),
+      body: JSON.stringify({ prompt }),
       signal: controller.signal
     });
-    if (!res.ok) throw new Error('AIVM error ' + res.status);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'AIVM error ' + res.status);
+    }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || data.content || data.result || '';
+    return data.reply || data.choices?.[0]?.message?.content || data.content || data.result || '';
   } finally {
     clearTimeout(timer);
   }
@@ -2521,14 +2532,23 @@ async function aivmGenerateColDesc() {
 }
 
 async function aivmAnalyzeNFT(id) {
-  const nft = DEMO_NFTS.find(n=>n.id===id);
+  const nft = realNFTs.find(n => n.id === id) || DEMO_NFTS.find(n => n.id === id);
   if (!nft) return;
   const el = document.getElementById('nftAivmAnalysis');
-  el.innerHTML = '<span class="loading-spinner"></span> Analyzing with AIVM…';
+  if (!el) return;
+  el.innerHTML = '<span class="loading-spinner"></span> Analyzing with AIVM… (may take up to 2 min)';
   try {
-    const text = await aivmCall(`Briefly analyze the NFT "${nft.name}" (${['artist-uploaded','AIVM-enhanced','AIVM-generated'][nft.origin]} art). Comment on its potential value and uniqueness in 2 sentences.`);
+    const origin = ['artist-uploaded', 'AIVM-enhanced', 'AIVM-generated'][nft.origin] || 'artist-uploaded';
+    const listed = nft.price && nft.price !== '—' && parseFloat(nft.price) > 0;
+    const text = await aivmCall(
+      `Briefly analyze the NFT "${nft.name}" (token #${nft.id}, ${origin} art${listed ? ', listed at ' + nft.price + ' LCAI' : ', not listed for sale'}). Comment on its uniqueness and appeal to collectors in 2–3 sentences. Be specific to this piece.`
+    );
+    if (!text || !text.trim()) throw new Error('Empty response');
     el.textContent = text.trim();
-  } catch(e) { el.textContent = 'AIVM analysis unavailable right now.'; }
+  } catch(e) {
+    console.warn('aivmAnalyzeNFT', e);
+    el.textContent = 'AIVM analysis unavailable right now. Try again in a moment.';
+  }
 }
 
 // ── MODERATION ──────────────────────────────────────────────────────────────
