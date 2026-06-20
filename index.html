@@ -1930,7 +1930,10 @@ async function submitListing() {
   if (receipt) {
     document.getElementById('listModal').classList.remove('open');
     toast('NFT listed for sale!', 'ok', 4000);
-    setTimeout(() => loadRealNFTs().then(() => showPage('profile')), 2000);
+    await loadRealNFTs();
+    openNftModal(id);
+    updateProfileStats();
+    showProfileTab('listings');
   }
 }
 
@@ -2356,6 +2359,10 @@ async function loadRealNFTs() {
     if (loaded.length > 0) {
       realNFTs = loaded;
       refreshNFTViews();
+      if (S.activeNftModal) {
+        const refreshed = realNFTs.find(n => n.id === S.activeNftModal.id);
+        if (refreshed) openNftModal(refreshed.id);
+      }
     }
   } catch(e) {
     console.warn('Could not load real NFTs:', e);
