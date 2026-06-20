@@ -269,9 +269,11 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .profile-avatar {
   width: 96px; height: 96px; border-radius: 50%; border: 4px solid var(--bg); background: var(--card2);
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  font-size: 2.4rem; font-weight: 800; letter-spacing: .02em; color: #fff;
+  font-size: 2.4rem; font-weight: 800; letter-spacing: .02em; color: #fff; overflow: hidden;
 }
-.profile-avatar.wallet-avatar { font-size: 1.35rem; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.profile-avatar.clickable { cursor: pointer; transition: box-shadow .15s; }
+.profile-avatar.clickable:hover { box-shadow: 0 0 0 2px var(--cyan); }
 .profile-header { padding: 0 0 6px; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .profile-name { font-size: 1.45rem; font-weight: 800; margin-bottom: 4px; }
 .profile-addr { font-size: .82rem; color: var(--text3); font-family: monospace; cursor: pointer; word-break: break-all; }
@@ -779,7 +781,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
       <div class="profile-banner" id="profileBanner"></div>
       <div class="profile-identity">
         <div class="profile-identity-main">
-          <div class="profile-avatar" id="profileAvatar">🐬</div>
+          <div class="profile-avatar" id="profileAvatar" onclick="pickProfileAvatar()" title="Click to change profile photo">🐬</div>
+          <input type="file" id="profileAvatarInput" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="onProfileAvatarPicked(this.files[0])">
           <div class="profile-header">
             <div class="profile-name" id="profileName">Connect wallet to view profile</div>
             <div class="profile-addr" id="profileAddrEl" onclick="copyAddr()">—</div>
@@ -1821,6 +1824,80 @@ function buildRealActivity() {
   return rows.sort((a, b) => b.time - a.time);
 }
 
+function profileAvatarStorageKey() {
+  return 'om_avatar_' + (S.wallet || '').toLowerCase();
+}
+
+function getSavedProfileAvatar() {
+  if (!S.wallet) return null;
+  try { return localStorage.getItem(profileAvatarStorageKey()); } catch(e) { return null; }
+}
+
+function saveProfileAvatar(dataUrl) {
+  if (!S.wallet) return;
+  try { localStorage.setItem(profileAvatarStorageKey(), dataUrl); }
+  catch(e) { toast('Could not save photo — try a smaller image.', 'err'); }
+}
+
+function defaultProfileAvatarFromNFTs() {
+  const mine = profileNFTsForWallet();
+  const withImg = mine.find(n => n.image);
+  return withImg ? withImg.image : 'orca-icon.png';
+}
+
+function renderProfileAvatar(el) {
+  if (!el) return;
+  el.classList.remove('clickable');
+  el.onclick = null;
+  el.removeAttribute('title');
+  if (!S.wallet) {
+    el.textContent = '🐬';
+    return;
+  }
+  const src = getSavedProfileAvatar() || defaultProfileAvatarFromNFTs();
+  el.classList.add('clickable');
+  el.onclick = pickProfileAvatar;
+  el.title = 'Click to change profile photo';
+  el.textContent = '';
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = 'Profile photo';
+  el.appendChild(img);
+}
+
+function pickProfileAvatar() {
+  if (!S.wallet) { connectWallet(); return; }
+  const input = document.getElementById('profileAvatarInput');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function onProfileAvatarPicked(file) {
+  if (!file || !S.wallet) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const side = 256;
+      const canvas = document.createElement('canvas');
+      canvas.width = side;
+      canvas.height = side;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(side / img.width, side / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, (side - w) / 2, (side - h) / 2, w, h);
+      saveProfileAvatar(canvas.toDataURL('image/jpeg', 0.85));
+      renderProfileAvatar(document.getElementById('profileAvatar'));
+      toast('Profile photo updated', 'ok');
+    };
+    img.onerror = () => toast('Could not load that image', 'err');
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function renderProfile() {
   const name = document.getElementById('profileName');
   const addrEl = document.getElementById('profileAddrEl');
@@ -1837,21 +1914,13 @@ function renderProfile() {
         <button class="btn btn-primary" onclick="connectWallet()">Connect Wallet</button>
       </div>`;
     shareBtn.style.display = 'none';
-    avatar.textContent = '🐬';
-    avatar.classList.remove('wallet-avatar');
-    avatar.style.background = 'var(--card2)';
-    avatar.removeAttribute('title');
+    renderProfileAvatar(avatar);
     return;
   }
   name.textContent = 'Wallet ' + shortAddr(S.wallet);
   addrEl.textContent = S.wallet;
   shareBtn.style.display = '';
-  // Color avatar from wallet
-  const hue = parseInt(S.wallet.slice(2,6),16) % 360;
-  avatar.classList.add('wallet-avatar');
-  avatar.style.background = `hsl(${hue},55%,32%)`;
-  avatar.textContent = S.wallet.slice(2, 4).toUpperCase();
-  avatar.title = 'Profile avatar from your wallet address';
+  renderProfileAvatar(avatar);
   updateProfileStats();
   showProfileTab(S.currentProfileTab);
 }
