@@ -1791,6 +1791,7 @@ function showProfileTab(tab) {
     const fallback = DEMO_ACTIVITY.slice(0,3).map(a=>`<tr><td><span class="event-badge ${a.event==='Mint'?'ev-mint':'ev-sale'}">${a.event}</span></td><td>${a.item}</td><td>${a.price} LCAI</td><td class="text-muted">${timeAgo(a.time)}</td></tr>`).join('');
     content.innerHTML = `<div style="overflow-x:auto"><table class="activity-table"><thead><tr><th>Event</th><th>Item</th><th>Price</th><th>Time</th></tr></thead><tbody>${activityRows.length ? activityRows.join('') : fallback}</tbody></table></div>`;
   }
+  updateProfileStats();
 }
 
 function copyAddr() { if(S.wallet) copyText(S.wallet); }
