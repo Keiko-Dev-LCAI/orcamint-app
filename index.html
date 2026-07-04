@@ -98,16 +98,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .notif-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; background: var(--red); border-radius: 50%; border: 2px solid var(--bg2); }
 
 /* ── PAGE CONTENT ── */
-#page { flex: 1 1 auto; min-height: 0; padding: 0; overflow-x: hidden; overflow-y: auto; }
-#site-footer {
-  flex-shrink: 0; background: var(--bg2); border-top: 1px solid rgba(255,255,255,0.07);
-  z-index: 40; box-shadow: 0 -6px 28px rgba(0,0,0,.4);
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
-.site-footer-pod { text-align: center; padding: 12px 20px 6px; }
-.site-footer-links { padding: 6px 16px 12px; text-align: center; }
-.site-footer-links a { color: #9b7fe8; text-decoration: none; font-weight: 600; font-size: 13px; }
-.site-footer-pod a { color: #7ec8e3; font-size: 13px; text-decoration: none; font-weight: 600; letter-spacing: .02em; }
+#page { flex: 1 1 auto; min-height: 0; padding: 0 0 env(safe-area-inset-bottom, 0); overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.settings-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 20px; margin-bottom: 16px; }
+.settings-link-list { display: flex; flex-direction: column; gap: 10px; }
+.settings-link-list a { color: #9b7fe8; text-decoration: none; font-weight: 600; font-size: .95rem; line-height: 1.4; }
+.settings-link-list a:hover { color: var(--cyan); }
+.settings-link-list a.settings-link-cyan { color: #7ec8e3; }
+.settings-android-btn { display: inline-block; margin-top: 6px; background: linear-gradient(135deg, var(--cyan), #00b8d4); color: #000 !important; font-weight: 800; font-size: 1rem; padding: 12px 18px; border-radius: 10px; text-decoration: none; text-align: center; }
+.settings-android-hint { margin-top: 8px; font-size: .82rem; color: var(--text2); line-height: 1.45; }
 .page-section { display: none; }
 .page-section.active { display: block; max-width: 920px; margin: 0 auto; }
 
@@ -404,7 +402,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 
 /* ── ACTIVITY PAGE ── */
 #sec-activity.active {
-  max-width: none; width: 100%; min-height: calc(100vh - 60px - 108px);
+  max-width: none; width: 100%; min-height: calc(100vh - 60px);
   display: flex; flex-direction: column; box-sizing: border-box;
 }
 #sec-activity .activity-header { padding: 28px 32px 18px; flex-shrink: 0; }
@@ -581,11 +579,10 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   .notif-panel { width: 100%; max-width: 100vw; }
   .notif-body p { font-size: .95rem; }
 
-  /* ── Footer ── */
-  .site-footer-pod a, .site-footer-links a { font-size: 15px; }
-  .keiko-android-install { text-align: center; padding: 12px 16px 14px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25); }
-  .keiko-android-install a { display: inline-block; background: #00d4ff; color: #000; font-weight: 800; font-size: 15px; padding: 10px 18px; border-radius: 10px; text-decoration: none; }
-  .keiko-android-install p { margin-top: 6px; font-size: 13px; opacity: 0.65; }
+  /* ── Settings ── */
+  .settings-card { padding: 16px; }
+  .settings-link-list a { font-size: 1rem; }
+  .settings-android-btn { width: 100%; box-sizing: border-box; }
 
   /* ── Empty states & toasts ── */
   .empty-state h3 { font-size: 1.15rem; }
@@ -971,7 +968,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
       <div style="max-width:600px;margin:0 auto;padding:32px 24px;">
         <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:20px;">⚙️ Settings</h2>
 
-        <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:16px;">
+        <div class="settings-card">
           <div style="font-weight:700;margin-bottom:14px;">Platform Info</div>
           <div class="fee-row"><span class="lbl">Network</span><span class="val">Lightchain (chainId 9200)</span></div>
           <div class="fee-row"><span class="lbl">Native coin</span><span class="val">LCAI</span></div>
@@ -981,7 +978,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           <div class="fee-row"><span class="lbl">Contract</span><span class="val addr-short" id="settingsContract">Not deployed yet</span></div>
         </div>
 
-        <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:16px;">
+        <div class="settings-card">
           <div style="font-weight:700;margin-bottom:14px;">Wallet</div>
           <div class="fee-row"><span class="lbl">Connected address</span><span class="val addr-short" id="settingsWallet">—</span></div>
           <div class="fee-row"><span class="lbl">Network status</span><span class="val" id="settingsNetwork">—</span></div>
@@ -991,7 +988,20 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           </div>
         </div>
 
-        <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px;">
+        <div class="settings-card">
+          <div style="font-weight:700;margin-bottom:14px;">Links &amp; App</div>
+          <div class="settings-link-list">
+            <a href="https://keiko-dev-lcai.github.io/orcapod/" target="_blank" rel="noopener" class="settings-link-cyan">🐬 Other Orca dApps →</a>
+            <a href="https://x.com/KeikoDevLCAI" target="_blank" rel="noopener">𝕏 @KeikoDevLCAI</a>
+            <a href="#" onclick="(function(){navigator.clipboard.writeText('0xA3a653a8cBA0710ff57Ac34E2278C603B4259FD3').catch(function(){});window.open('https://orcamail.ai','_blank');var t=document.getElementById('_dctoast');if(t){t.style.display='block';setTimeout(function(){t.style.display='none'},3000);}})();return false;">Contact Developer via OrcaMail 🐬</a>
+            <a href="https://orcamail.ai" target="_blank" rel="noopener">📢 Advertise with us</a>
+            <a href="OrcaMint.apk" download class="settings-android-btn">📲 Download Android App</a>
+            <p class="settings-android-hint">Download → open file → Install. Allow unknown apps if asked.</p>
+            <a href="#" onclick="document.getElementById('orca-terms-overlay').style.display='flex';return false;">📋 Terms &amp; Disclaimer</a>
+          </div>
+        </div>
+
+        <div class="settings-card">
           <div style="font-weight:700;margin-bottom:14px;">About</div>
           <p style="font-size:.85rem;color:var(--text2);line-height:1.6;">OrcaMint is the first <strong style="color:var(--cyan)">truly on-chain</strong> NFT platform on Lightchain. Your artwork is stored <strong style="color:var(--cyan)">directly on the blockchain</strong> — no IPFS, no cloud storage, no servers that can disappear. Every other NFT platform gives you a receipt pointing to a server. OrcaMint puts the actual art on-chain, permanently. Mint with ERC-721 + ERC-2981 royalties. Powered by Lightchain AIVM.</p>
           <div style="margin-top:12px;font-size:.78rem;color:var(--text3);">
@@ -1019,25 +1029,6 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
     </div>
 
   </div><!-- #page -->
-
-  <footer id="site-footer">
-    <div class="site-footer-pod">
-      <a href="https://keiko-dev-lcai.github.io/orcapod/" target="_blank" rel="noopener">🐬 Other Orca dApps →</a>
-    </div>
-    <div class="site-footer-links">
-      <a href="https://x.com/KeikoDevLCAI" target="_blank" rel="noopener" style="opacity:0.75;">𝕏 @KeikoDevLCAI</a>
-      <div style="margin-top:6px;font-size:13px;opacity:0.55;">Questions or ideas? <a href="#" onclick="(function(){navigator.clipboard.writeText('0xA3a653a8cBA0710ff57Ac34E2278C603B4259FD3').catch(function(){});window.open('https://orcamail.ai','_blank');var t=document.getElementById('_dctoast');if(t){t.style.display='block';setTimeout(function(){t.style.display='none'},3000);}})();return false;" style="color:#6c47ff;">Contact Developer via OrcaMail &#x1F42C;</a></div>
-      <div style="margin-top:4px;font-size:13px;opacity:0.8;"><a href="https://orcamail.ai" target="_blank" rel="noopener">📢 Advertise with us</a></div>
-    </div>
-  </footer>
-
-  <!-- Android APK download bar — kept inside #main so it stays within the flex column.
-       (Was previously a direct <body> child; since body is display:flex, it became a
-       flex-row sibling of #main and crushed the main content to a sliver.) -->
-  <div class="keiko-android-install">
-    <a href="OrcaMint.apk" download>📲 Download Android App</a>
-    <p>Download → open file → Install. Allow unknown apps if asked.</p>
-  </div>
 </div><!-- #main -->
 
 <!-- ── NFT DETAIL MODAL ── -->
