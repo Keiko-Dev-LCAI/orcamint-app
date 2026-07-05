@@ -1,0 +1,27 @@
+{
+  "name": "orcamint-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "orca-integrations.js",
+  "scripts": {
+    "sync:www": "bash sync-www.sh",
+    "cap:sync": "npm run sync:www && npx cap sync android",
+    "cap:open": "npx cap open android"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Keiko-Dev-LCAI/orcamint-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Keiko-Dev-LCAI/orcamint-app/issues"
+  },
+  "homepage": "https://github.com/Keiko-Dev-LCAI/orcamint-app#readme",
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1"
+  }
+}
