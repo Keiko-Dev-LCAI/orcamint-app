@@ -9,6 +9,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OrcaMint">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script src="orca-integrations.js"></script>
+<script src="orca-sentry.js" defer></script>
+<script src="orca-sw-register.js" defer></script>
 <title>OrcaMint — NFT Platform on Lightchain</title>
 <style>
 :root {
@@ -1557,7 +1560,7 @@ async function connectViaWalletConnect() {
   if (!window.WCEthereumProvider) { toast('WalletConnect not loaded yet. Try again.', 'err'); return; }
   try {
     _wcProv = await window.WCEthereumProvider.init({
-      projectId: '3c6a0da53258912a28923198ddac3333',
+      projectId: (window.ORCA_INTEGRATIONS && window.ORCA_INTEGRATIONS.walletConnectProjectId) || '3c6a0da53258912a28923198ddac3333',
       chains: [9200],
       optionalChains: [1],
       showQrModal: true,

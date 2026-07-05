@@ -1,0 +1,8 @@
+{
+  "appId": "ai.lightchain.orcamint",
+  "appName": "OrcaMint",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
