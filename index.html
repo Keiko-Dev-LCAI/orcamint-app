@@ -119,7 +119,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   display: flex; align-items: center; padding: 0 48px;
 }
 .hero-bg {
-  position: absolute; inset: 0; opacity: .25;
+  position: absolute; inset: 0; opacity: .25; pointer-events: none;
   background: radial-gradient(ellipse at 20% 50%, #7c4dff 0%, transparent 50%),
               radial-gradient(ellipse at 80% 20%, #00e5ff 0%, transparent 40%),
               radial-gradient(ellipse at 60% 80%, #ff4081 0%, transparent 35%);
@@ -128,8 +128,9 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .hero h1 { font-size: 2.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 12px; }
 .hero h1 span { background: linear-gradient(90deg, var(--cyan), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .hero p { color: var(--text2); font-size: 1.05rem; max-width: 480px; margin-bottom: 24px; }
-.hero-btns { display: flex; gap: 12px; }
+.hero-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .btn { padding: 11px 22px; border-radius: var(--radius-sm); border: none; cursor: pointer; font-weight: 600; font-size: .9rem; transition: all .2s; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
 .btn-primary { background: linear-gradient(135deg, var(--cyan), var(--purple)); color: #000; }
 .btn-primary:hover { opacity: .85; transform: translateY(-1px); }
 .btn-outline { background: transparent; border: 1.5px solid var(--cyan); color: var(--cyan); }
@@ -137,7 +138,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .btn-sm { padding: 7px 14px; font-size: .82rem; }
 .btn-danger { background: var(--red); color: #fff; }
 
-.hero-stats { position: absolute; right: 48px; bottom: 32px; display: flex; gap: 32px; }
+.hero-stats { position: absolute; right: 48px; bottom: 32px; display: flex; gap: 32px; z-index: 2; pointer-events: none; }
 .hero-stat { text-align: center; }
 .hero-stat .val { font-size: 1.6rem; font-weight: 800; color: var(--cyan); }
 .hero-stat .lbl { font-size: .72rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
@@ -697,6 +698,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           <div class="hero-btns">
             <button class="btn btn-primary" onclick="showPage('studio')">✨ Start Minting</button>
             <button class="btn btn-outline" onclick="showPage('collections')">Browse Collections</button>
+            <a class="btn btn-outline" href="https://lightdex.app/" target="_blank" rel="noopener">Get LCAI · LCAI Swap ↗</a>
           </div>
         </div>
         <div class="hero-stats">
@@ -704,9 +706,6 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           <div class="hero-stat"><div class="val" id="statCols">—</div><div class="lbl">Collections</div></div>
           <div class="hero-stat"><div class="val" id="statFloor">1 LCAI</div><div class="lbl">Mint Fee</div></div>
         </div>
-        <p style="margin:10px 48px 12px 0;text-align:right;font-size:.85rem;">
-          <a href="https://lightdex.app/" target="_blank" rel="noopener" style="color:var(--cyan);font-weight:700;text-decoration:none;">Get LCAI · LCAI Swap ↗</a>
-        </p>
       </div>
 
       <div class="sec-header">
