@@ -1683,34 +1683,61 @@ function initPage() {
   }
 }
 
+function safeStatFromNextId(hex) {
+  try {
+    if (hex == null || hex === '' || hex === '0x') return null;
+    const n = Number(BigInt(hex));
+    if (!Number.isFinite(n) || n < 1) return 0;
+    return n - 1;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function loadContractData() {
+  const elN = document.getElementById('statNFTs');
+  const elC = document.getElementById('statCols');
   if (CONTRACT_ADDR === 'DEPLOY_ME') {
-    document.getElementById('statNFTs').textContent = DEMO_NFTS.length + '+';
-    document.getElementById('statCols').textContent = DEMO_COLLECTIONS.length + '+';
+    if (elN) elN.textContent = DEMO_NFTS.length + '+';
+    if (elC) elC.textContent = DEMO_COLLECTIONS.length + '+';
     return;
   }
   try {
-    // If ethers is loaded, use it; otherwise use raw eth_call
     const nextTok = await ethCall('nextTokenId', []);
     const nextCol = await ethCall('nextCollectionId', []);
-    const fee = await ethCall('mintFee', []);
-    document.getElementById('statNFTs').textContent = (parseInt(nextTok,16)-1).toString();
-    document.getElementById('statCols').textContent = (parseInt(nextCol,16)-1).toString();
-    S.mintFee = BigInt(nextTok); // placeholder
+    const nfts = safeStatFromNextId(nextTok);
+    const cols = safeStatFromNextId(nextCol);
+    if (elN) elN.textContent = nfts == null ? '—' : String(nfts);
+    if (elC) elC.textContent = cols == null ? '—' : String(cols);
     document.getElementById('fpMintFee').textContent = 'Free';
     document.getElementById('fpTotal').textContent = 'Free';
     S.mintFee = BigInt(0);
     fetchLcaiPrice();
-  } catch(e) { console.warn('Contract read failed:', e); }
+  } catch (e) {
+    console.warn('Contract read failed:', e);
+    if (elN && (!elN.textContent || elN.textContent === 'NaN')) elN.textContent = '—';
+    if (elC && (!elC.textContent || elC.textContent === 'NaN')) elC.textContent = '—';
+  }
 }
 
 // ── RAW ETH CALL ──
 async function ethCall(method, params) {
-  if (!window.ethereum) throw new Error('No wallet');
   const sig = abiEncode(method, params);
+  const callParams = [{ to: CONTRACT_ADDR, data: sig }, 'latest'];
+  // Prefer public RPC so hero stats work without a wallet
+  try {
+    const r = await fetch('https://rpc.mainnet.lightchain.ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: callParams })
+    });
+    const j = await r.json();
+    if (j.result) return j.result;
+  } catch (_) { /* fall through */ }
+  if (!window.ethereum) throw new Error('No wallet');
   const result = await window.ethereum.request({
     method: 'eth_call',
-    params: [{ to: CONTRACT_ADDR, data: sig }, 'latest']
+    params: callParams
   });
   return result;
 }
