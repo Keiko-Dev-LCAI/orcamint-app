@@ -114,9 +114,10 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 
 /* ── HERO BANNER ── */
 .hero {
-  position: relative; height: 340px; overflow: hidden;
+  position: relative; min-height: 340px; height: auto; overflow: hidden;
   background: linear-gradient(135deg, #0d0d3a 0%, #1a0a3a 50%, #0a2030 100%);
-  display: flex; align-items: center; padding: 0 48px;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+  padding: 36px 48px 0; box-sizing: border-box;
 }
 .hero-bg {
   position: absolute; inset: 0; opacity: .25; pointer-events: none;
@@ -127,7 +128,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .hero-content { position: relative; z-index: 2; }
 .hero h1 { font-size: 2.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 12px; }
 .hero h1 span { background: linear-gradient(90deg, var(--cyan), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.hero p { color: var(--text2); font-size: 1.05rem; max-width: 480px; margin-bottom: 24px; }
+.hero p { color: var(--text2); font-size: 1.05rem; max-width: 560px; margin-bottom: 24px; }
 .hero-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .btn { padding: 11px 22px; border-radius: var(--radius-sm); border: none; cursor: pointer; font-weight: 600; font-size: .9rem; transition: all .2s; }
 a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
@@ -138,10 +139,17 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .btn-sm { padding: 7px 14px; font-size: .82rem; }
 .btn-danger { background: var(--red); color: #fff; }
 
-.hero-stats { position: absolute; right: 48px; bottom: 32px; display: flex; gap: 32px; z-index: 2; pointer-events: none; }
-.hero-stat { text-align: center; }
-.hero-stat .val { font-size: 1.6rem; font-weight: 800; color: var(--cyan); }
-.hero-stat .lbl { font-size: .72rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+/* Stats row under buttons — never overlaps CTAs */
+.hero-stats {
+  position: relative; z-index: 2;
+  display: flex; gap: 40px; justify-content: flex-start;
+  margin-top: 28px; padding: 18px 0 22px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  pointer-events: none;
+}
+.hero-stat { text-align: left; min-width: 96px; }
+.hero-stat .val { font-size: 1.6rem; font-weight: 800; color: var(--cyan); line-height: 1.2; }
+.hero-stat .lbl { font-size: .72rem; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
 
 /* ── SECTION HEADERS ── */
 .sec-header { display: flex; align-items: center; justify-content: space-between; padding: 28px 24px 16px; }
@@ -486,13 +494,14 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   .topbar-wallet-badge.show { max-width: 96px; font-size: .72rem; }
 
   /* ── Hero ── */
-  .hero { padding: 24px 16px 0; height: auto; min-height: auto; flex-direction: column; align-items: flex-start; overflow: hidden; box-sizing: border-box; }
+  .hero { padding: 24px 16px 0; height: auto; min-height: auto; flex-direction: column; align-items: stretch; overflow: hidden; box-sizing: border-box; }
   .hero h1 { font-size: 2rem; line-height: 1.2; white-space: normal; word-break: break-word; margin-bottom: 12px; }
   .hero p { font-size: 1rem; line-height: 1.55; max-width: 100%; margin-bottom: 18px; }
   .hero-btns { flex-direction: column; gap: 10px; width: 100%; }
   .hero-btns .btn { width: 100%; box-sizing: border-box; text-align: center; justify-content: center; padding: 14px 16px; font-size: 1rem; }
   .hero-content { max-width: 100%; width: 100%; box-sizing: border-box; }
-  .hero-stats { position: static; display: flex; gap: 0; padding: 14px 10px; background: rgba(0,0,0,.3); border-top: 1px solid rgba(255,255,255,.08); margin-top: 18px; width: 100%; justify-content: space-around; box-sizing: border-box; }
+  .hero-stats { position: relative; display: flex; gap: 0; padding: 14px 10px; background: rgba(0,0,0,.3); border-top: 1px solid rgba(255,255,255,.08); margin-top: 18px; width: 100%; justify-content: space-around; box-sizing: border-box; }
+  .hero-stat { text-align: center; min-width: 0; }
   .hero-stat .val { font-size: 1.25rem; }
   .hero-stat .lbl { font-size: .72rem; }
 
