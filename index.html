@@ -1713,22 +1713,33 @@ async function loadContractData() {
     if (elC) elC.textContent = DEMO_COLLECTIONS.length + '+';
     return;
   }
+  // Isolate each read so a failing nextCollectionId does not wipe NFT count
   try {
     const nextTok = await ethCall('nextTokenId', []);
-    const nextCol = await ethCall('nextCollectionId', []);
     const nfts = safeStatFromNextId(nextTok);
-    const cols = safeStatFromNextId(nextCol);
     if (elN) elN.textContent = nfts == null ? '—' : String(nfts);
+  } catch (e) {
+    console.warn('nextTokenId read failed:', e);
+    if (elN && (!elN.textContent || elN.textContent === 'NaN' || elN.textContent === '—')) elN.textContent = '—';
+  }
+  try {
+    const nextCol = await ethCall('nextCollectionId', []);
+    const cols = safeStatFromNextId(nextCol);
     if (elC) elC.textContent = cols == null ? '—' : String(cols);
+  } catch (e) {
+    console.warn('nextCollectionId read failed (collections may be unavailable):', e);
+    // Prefer demo/catalog length over blank if contract has no working collections counter
+    const fallback = (typeof DEMO_COLLECTIONS !== 'undefined' && DEMO_COLLECTIONS.length)
+      ? String(DEMO_COLLECTIONS.length)
+      : '—';
+    if (elC) elC.textContent = fallback;
+  }
+  try {
     document.getElementById('fpMintFee').textContent = 'Free';
     document.getElementById('fpTotal').textContent = 'Free';
     S.mintFee = BigInt(0);
     fetchLcaiPrice();
-  } catch (e) {
-    console.warn('Contract read failed:', e);
-    if (elN && (!elN.textContent || elN.textContent === 'NaN')) elN.textContent = '—';
-    if (elC && (!elC.textContent || elC.textContent === 'NaN')) elC.textContent = '—';
-  }
+  } catch (_) { /* fee UI optional */ }
 }
 
 // ── RAW ETH CALL ──
@@ -1736,6 +1747,7 @@ async function ethCall(method, params) {
   const sig = abiEncode(method, params);
   const callParams = [{ to: CONTRACT_ADDR, data: sig }, 'latest'];
   // Prefer public RPC so hero stats work without a wallet
+  let networkFail = false;
   try {
     const r = await fetch('https://rpc.mainnet.lightchain.ai', {
       method: 'POST',
@@ -1743,14 +1755,20 @@ async function ethCall(method, params) {
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: callParams })
     });
     const j = await r.json();
-    if (j.result) return j.result;
-  } catch (_) { /* fall through */ }
-  if (!window.ethereum) throw new Error('No wallet');
-  const result = await window.ethereum.request({
-    method: 'eth_call',
-    params: callParams
-  });
-  return result;
+    if (j.error) throw new Error(j.error.message || 'eth_call reverted');
+    if (j.result != null && j.result !== '0x') return j.result;
+    throw new Error('eth_call empty result');
+  } catch (e) {
+    // Reverts / empty results must not be hidden — isolate callers handle per-method
+    const msg = (e && e.message) ? e.message : String(e);
+    if (/revert|empty result|execution/i.test(msg)) throw e;
+    networkFail = true;
+    console.warn('Public RPC failed, trying wallet:', msg);
+  }
+  if (!window.ethereum) throw new Error(networkFail ? 'No wallet and public RPC failed' : 'eth_call failed');
+  const result = await window.ethereum.request({ method: 'eth_call', params: callParams });
+  if (result != null && result !== '0x') return result;
+  throw new Error('eth_call empty');
 }
 
 // ── ABI ENCODE (minimal for view calls with no params) ──
