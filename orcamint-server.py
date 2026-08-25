@@ -6,6 +6,19 @@ PORT      = int(os.environ.get("PORT", 8080))
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 HTML_FILE = os.path.join(BASE_DIR, "index.html")
 
+# Scoped CORS — override with CORS_ORIGINS env (comma-separated)
+_CORS_ORIGINS = [o.strip() for o in os.environ.get(
+    "CORS_ORIGINS",
+    "https://orcamint.xyz,http://localhost:8080,http://127.0.0.1:8080"
+).split(",") if o.strip()]
+
+
+def _cors_for(handler) -> str:
+    origin = (handler.headers.get("Origin") or "").strip()
+    if origin in _CORS_ORIGINS:
+        return origin
+    return _CORS_ORIGINS[0] if _CORS_ORIGINS else "https://orcamint.xyz"
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
@@ -20,7 +33,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", _cors_for(self))
+        self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
