@@ -1,0 +1,41 @@
+# Cloudflare Workers static assets — do not upload repo/build/private junk.
+# Format is .gitignore-style. Kept in assets root (repo root).
+
+# VCS / tooling
+.git/
+.wrangler/
+.github/
+.grok/
+.capacitor/
+.venv/
+
+# Native / Capacitor build trees (served copies live at repo root)
+android/
+ios/
+www/
+dist/
+node_modules/
+moderation/
+
+# Python / Railway server (not needed on CF Worker)
+__pycache__/
+*.pyc
+*.py
+Procfile
+requirements.txt
+
+# Docs / source / package metadata
+*.md
+*.sol
+package.json
+package-lock.json
+capacitor.config.json
+sync-www.sh
+.railwayignore
+.gitignore
+
+# APK / keystores — never publish
+*.apk
+*.jks
+*.keystore
+key.properties
