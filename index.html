@@ -1855,15 +1855,16 @@ function nftGalleryImage(n) {
   const hosted = HOSTED_NFT_IMAGES[String(n.id)];
   if (hosted) return hosted;
   const img = n.image || '';
-  if (img && !img.startsWith('data:')) return img;
+  if (img && (img.startsWith('data:image/') || !img.startsWith('data:'))) return img;
   return null;
 }
 
 function nftCardImageHtml(n) {
   const src = nftGalleryImage(n);
   const alt = String(n.name || 'NFT').replace(/"/g, '&quot;');
-  if (src) return `<img src="${src}" alt="${alt}" loading="lazy" decoding="async">`;
-  return `<span class="nft-card-emoji">${n.emoji || '🖼️'}</span>`;
+  const emoji = (n.emoji || '🖼️');
+  if (src) return `<img src="${src}" alt="${alt}" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nft-card-emoji',textContent:'${emoji}'}))">`;
+  return `<span class="nft-card-emoji">${emoji}</span>`;
 }
 
 function renderNFTGrid(containerId, nfts, adminButtons = false) {
@@ -2231,7 +2232,10 @@ function openNftModal(id) {
   S.activeNftModal = nft;
   const imgEl = document.getElementById('nftModalImg');
   const modalSrc = nftGalleryImage(nft);
-  imgEl.innerHTML = modalSrc ? `<img src="${modalSrc}" alt="${nft.name}">` : `<span style="font-size:6rem">${nft.emoji||'🖼️'}</span>`;
+  const emoji = (nft.emoji || '🖼️');
+  imgEl.innerHTML = modalSrc
+    ? `<img src="${modalSrc}" alt="${String(nft.name||'NFT').replace(/"/g,'&quot;')}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{style:'font-size:6rem',textContent:'${emoji}'}))">`
+    : `<span style="font-size:6rem">${emoji}</span>`;
   const isOwner = S.wallet && nft.creator && nft.creator.toLowerCase() === S.wallet.toLowerCase();
   const isListed = nft.price && nft.price !== '—' && parseFloat(nft.price) > 0;
   const isMinted = !!nft.real;

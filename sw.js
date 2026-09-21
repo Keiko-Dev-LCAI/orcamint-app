@@ -1,5 +1,5 @@
 /* Orca PWA service worker — cache shell for faster reloads on mobile */
-const CACHE = 'orca-shell-v1';
+const CACHE = 'orca-shell-v2';
 const PRECACHE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', function (e) {
