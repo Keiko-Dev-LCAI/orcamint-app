@@ -1368,7 +1368,14 @@ function timeAgo(ts) {
   if (s < 60) return s + 's ago';
   if (s < 3600) return Math.floor(s/60) + 'm ago';
   if (s < 86400) return Math.floor(s/3600) + 'h ago';
-  return Math.floor(s/86400) + 'd ago';
+  const d = Math.floor(s/86400);
+  if (d < 30) return d + 'd ago';
+  const mo = Math.floor(d/30);
+  if (mo < 12) return mo + 'mo ago';
+  return Math.floor(d/365) + 'y ago';
+}
+function absDate(ts) {
+  try { return new Date(ts).toISOString().slice(0, 10); } catch(e) { return ''; }
 }
 function originLabel(o) {
   const labels = ['🎨 Art source: uploaded by artist','⚡ Art source: AIVM enhanced','🤖 Art source: AIVM generated'];
@@ -2017,29 +2024,42 @@ function renderActivity() {
   const sub = document.getElementById('activitySub');
   const note = document.getElementById('activityPanelNote');
   if (!tbody) return;
-  const evClass = { Mint:'ev-mint', Sale:'ev-sale', List:'ev-list', Offer:'ev-offer' };
-  const realActivity = buildRealActivity();
-  const usingDemo = realActivity.length === 0;
-  const activity = usingDemo ? DEMO_ACTIVITY : realActivity;
+  const evClass = { Mint:'ev-mint', Sale:'ev-sale', List:'ev-list', Transfer:'ev-list', Offer:'ev-offer' };
+  if (!activityLoaded) {
+    if (sub) sub.textContent = 'Loading on-chain events…';
+    if (note) note.textContent = 'Reading Transfer logs from Lightchain.';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No on-chain activity yet</td></tr>';
+    return;
+  }
+  const activity = realActivity;
   if (sub) {
-    sub.textContent = usingDemo
-      ? 'Sample activity shown until real on-chain events exist.'
-      : 'Live on-chain mints and listings on Lightchain.';
+    sub.textContent = activity.length
+      ? 'Live on-chain mints and transfers on Lightchain.'
+      : 'No on-chain activity yet';
   }
   if (note) {
-    note.textContent = usingDemo
-      ? 'Demo rows only — your real mints and sales will show here.'
-      : `${activity.length} on-chain event${activity.length === 1 ? '' : 's'} so far. More appear as OrcaMint grows.`;
+    note.textContent = activity.length
+      ? `${activity.length} on-chain event${activity.length === 1 ? '' : 's'} so far. More appear as OrcaMint grows.`
+      : 'No on-chain activity yet';
   }
-  tbody.innerHTML = activity.map(a => `
+  if (!activity.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No on-chain activity yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = activity.map(a => {
+    const p = String(a.price || '');
+    const skipUnit = !p || p === '—' || p === 'Mint' || p.toLowerCase() === 'free';
+    const when = absDate(a.time);
+    return `
     <tr>
       <td><span class="event-badge ${evClass[a.event]||''}">${a.event}</span></td>
       <td>${activityItemCell(a.item)}</td>
-      <td>${a.price}${String(a.price).toLowerCase() === 'free' ? '' : ' LCAI'}</td>
+      <td>${skipUnit ? (p || '—') : p + ' LCAI'}</td>
       <td class="addr-short">${a.from}</td>
       <td class="addr-short">${a.to}</td>
-      <td class="text-muted">${timeAgo(a.time)}</td>
-    </tr>`).join('');
+      <td class="text-muted" title="${when}">${timeAgo(a.time)}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ── PROFILE ──
@@ -2066,25 +2086,116 @@ function refreshNFTViews() {
   if (S.currentPage === 'activity') renderActivity();
 }
 
-function buildRealActivity() {
-  if (!realNFTs.length) return [];
-  const rows = [];
-  realNFTs.forEach((n, i) => {
-    const who = shortAddr(n.creator);
-    rows.push({
-      event: 'Mint', item: n.name, price: 'Free',
-      from: who, to: who,
-      time: Date.now() - (realNFTs.length - i) * 600000 - 3600000
-    });
-    if (n.price && n.price !== '—' && parseFloat(n.price) > 0) {
-      rows.push({
-        event: 'List', item: n.name, price: formatLcaiAmount(parseFloat(n.price)),
-        from: who, to: '—',
-        time: Date.now() - (realNFTs.length - i) * 600000
-      });
-    }
+const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+const ZERO_TOPIC     = '0x' + '0'.repeat(64);
+let realActivity = [];
+let activityLoaded = false;
+const _blockTsCache = {};
+
+async function rpcJson(method, params) {
+  const resp = await fetch('https://rpc.mainnet.lightchain.ai', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
   });
-  return rows.sort((a, b) => b.time - a.time);
+  const d = await resp.json();
+  if (d.error) throw new Error(d.error.message);
+  return d.result;
+}
+
+async function blockTime(bnHex) {
+  if (_blockTsCache[bnHex] != null) return _blockTsCache[bnHex];
+  const b = await rpcJson('eth_getBlockByNumber', [bnHex, false]);
+  const t = parseInt(b.timestamp, 16) * 1000;
+  _blockTsCache[bnHex] = t;
+  return t;
+}
+
+async function rpcGetLogs(topics) {
+  const filter = { fromBlock: '0x0', toBlock: 'latest', address: CONTRACT_ADDR, topics };
+  try {
+    return (await rpcJson('eth_getLogs', [filter])) || [];
+  } catch (e) {
+    const latest = parseInt(await rpcJson('eth_blockNumber', []), 16);
+    const step = 500000;
+    const all = [];
+    for (let from = 0; from <= latest; from += step) {
+      const to = Math.min(from + step - 1, latest);
+      const part = await rpcJson('eth_getLogs', [{
+        fromBlock: '0x' + from.toString(16),
+        toBlock: '0x' + to.toString(16),
+        address: CONTRACT_ADDR,
+        topics
+      }]);
+      if (part) all.push(...part);
+    }
+    return all;
+  }
+}
+
+function nftNameById(tokenId) {
+  const n = realNFTs.find(x => Number(x.id) === Number(tokenId));
+  return (n && n.name) ? n.name : ('#' + tokenId);
+}
+
+async function loadRealActivity() {
+  try {
+    const listedTopic = (window.ethers && ethers.utils)
+      ? ethers.utils.id('Listed(uint256,address,uint256)')
+      : null;
+    const soldTopic = (window.ethers && ethers.utils)
+      ? ethers.utils.id('Sold(uint256,address,address,uint256)')
+      : null;
+    const [transfers, listed, sold] = await Promise.all([
+      rpcGetLogs([TRANSFER_TOPIC]),
+      listedTopic ? rpcGetLogs([listedTopic]) : Promise.resolve([]),
+      soldTopic ? rpcGetLogs([soldTopic]) : Promise.resolve([])
+    ]);
+    const rows = [];
+    for (const lg of transfers) {
+      const fromT = (lg.topics[1] || '').toLowerCase();
+      const toT   = (lg.topics[2] || '').toLowerCase();
+      const tokenId = parseInt(lg.topics[3], 16);
+      const from = '0x' + (lg.topics[1] || '').slice(-40);
+      const to   = '0x' + (lg.topics[2] || '').slice(-40);
+      const time = await blockTime(lg.blockNumber);
+      const item = nftNameById(tokenId);
+      if (fromT === ZERO_TOPIC) {
+        rows.push({ event: 'Mint', item, price: 'Mint', from: shortAddr(to), to: shortAddr(to), time });
+      } else if (toT !== ZERO_TOPIC) {
+        rows.push({ event: 'Transfer', item, price: '—', from: shortAddr(from), to: shortAddr(to), time });
+      }
+    }
+    for (const lg of listed) {
+      const tokenId = parseInt(lg.topics[1], 16);
+      const seller  = '0x' + (lg.topics[2] || '').slice(-40);
+      let price = '—';
+      try {
+        const wei = ethers.BigNumber.from(lg.data || '0x0');
+        if (wei.gt(0)) price = parseFloat(ethers.utils.formatEther(wei)).toFixed(3).replace(/\.?0+$/, '');
+      } catch (e) {}
+      const time = await blockTime(lg.blockNumber);
+      rows.push({ event: 'List', item: nftNameById(tokenId), price, from: shortAddr(seller), to: '—', time });
+    }
+    for (const lg of sold) {
+      const tokenId = parseInt(lg.topics[1], 16);
+      const seller  = '0x' + (lg.topics[2] || '').slice(-40);
+      const buyer   = '0x' + (lg.topics[3] || '').slice(-40);
+      let price = '—';
+      try {
+        const wei = ethers.BigNumber.from(lg.data || '0x0');
+        if (wei.gt(0)) price = parseFloat(ethers.utils.formatEther(wei)).toFixed(3).replace(/\.?0+$/, '');
+      } catch (e) {}
+      const time = await blockTime(lg.blockNumber);
+      rows.push({ event: 'Sale', item: nftNameById(tokenId), price, from: shortAddr(seller), to: shortAddr(buyer), time });
+    }
+    realActivity = rows.sort((a, b) => b.time - a.time);
+  } catch (e) {
+    console.warn('Could not load activity logs:', e);
+    realActivity = [];
+  }
+  activityLoaded = true;
+  if (S.currentPage === 'activity') renderActivity();
 }
 
 function profileAvatarStorageKey() {
@@ -2857,6 +2968,7 @@ async function loadRealNFTs() {
     if (loaded.length > 0) {
       realNFTs = loaded;
       refreshNFTViews();
+      loadRealActivity();
       if (S.activeNftModal) {
         const refreshed = realNFTs.find(n => n.id === S.activeNftModal.id);
         if (refreshed) openNftModal(refreshed.id);
