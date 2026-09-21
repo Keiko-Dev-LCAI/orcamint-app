@@ -1227,12 +1227,9 @@ const ADMIN_WALLETS  = [
   '0xa3a653a8cba0710ff57ac34e2278c603b4259fd3',
   '0x2b6b64cc13dd6d5acabcf3a5dd72b6ee8004de35',
   '0x6518fd26a7ad2fe1ba80de5f279ee59f55c0a9ba', // MetaMask (fees) — contract owner
+  '0x1f899fad2c8bd70b6ef356ae6cc3c0abdbb15eb5', // Node Wallet / OrcaMint — token #1 owner
 ];
-// Display-only: token #1 was minted with a lost Node-worker key. On-chain owner
-// stays 0x1f89…; the site shows MetaMask so the card matches who you are now.
-const DISPLAY_WALLET_OVERRIDE = {
-  '1': '0x6518fd26a7ad2fe1ba80de5f279ee59f55c0a9ba',
-};
+const DISPLAY_WALLET_OVERRIDE = {};
 
 // ── MODERATION STATE ──
 let permanentHidden = new Set();   // token IDs permanently removed — loaded from GitHub
