@@ -1305,14 +1305,6 @@ const DEMO_DROPS = [
   { id:2, name:'AIVM Pioneers', creator:'Lightchain Labs', launchAt: Date.now() - 60000, maxSupply:100, mintCount:83, mintPrice:'5', emoji:'🤖', live:true },
   { id:3, name:'Neon Oceans', creator:'WaveArtist', launchAt: Date.now() + 24*60*60*1000, maxSupply:250, mintCount:0, mintPrice:'1.5', emoji:'🌊', live:false },
 ];
-const DEMO_ACTIVITY = [
-  { event:'Mint', item:'Orca #001', price:'1', from:'0x1F89…', to:'0x1F89…', time: Date.now()-120000 },
-  { event:'Sale', item:'Neon Wave', price:'8.0', from:'0xAbCd…', to:'0xDeF0…', time: Date.now()-500000 },
-  { event:'Offer', item:'Genesis Block', price:'90.0', from:'0x9876…', to:'—', time: Date.now()-900000 },
-  { event:'Mint', item:'AIVM Vision', price:'1', from:'0xDeF0…', to:'0xDeF0…', time: Date.now()-1200000 },
-  { event:'List', item:'Lightchain Pulse', price:'5.5', from:'0x1F89…', to:'—', time: Date.now()-2000000 },
-];
-
 // ── HELPERS ──
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || '—';
@@ -2076,12 +2068,29 @@ function profileNFTsForWallet() {
   return allNFTList.filter(n => n.creator && n.creator.toLowerCase() === w);
 }
 
+function myMintedNFTs() {
+  if (!S.wallet) return [];
+  const w = S.wallet.toLowerCase();
+  const all = realNFTs.length > 0 ? realNFTs : [];
+  if (!activityLoaded) return profileNFTsForWallet();
+  return all.filter(n => (mintedBy[Number(n.id)] || '') === w);
+}
+function myCollectedNFTs() {
+  if (!S.wallet) return [];
+  const w = S.wallet.toLowerCase();
+  if (!activityLoaded) return [];
+  return profileNFTsForWallet().filter(n => (mintedBy[Number(n.id)] || '') !== w);
+}
+
 function updateProfileStats() {
-  const myNFTs = profileNFTsForWallet();
-  const listed = myNFTs.filter(n => n.price && n.price !== '—' && parseFloat(n.price) > 0);
+  const minted    = myMintedNFTs();
+  const collected = myCollectedNFTs();
+  const listed    = profileNFTsForWallet().filter(n => n.price && n.price !== '—' && parseFloat(n.price) > 0);
   const createdEl = document.getElementById('pStatCreated');
+  const collectedEl = document.getElementById('pStatCollected');
   const listingsEl = document.getElementById('pStatListings');
-  if (createdEl) createdEl.textContent = String(myNFTs.length);
+  if (createdEl) createdEl.textContent = String(minted.length);
+  if (collectedEl) collectedEl.textContent = String(collected.length);
   if (listingsEl) listingsEl.textContent = String(listed.length);
 }
 
@@ -2096,6 +2105,7 @@ const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a
 const ZERO_TOPIC     = '0x' + '0'.repeat(64);
 let realActivity = [];
 let activityLoaded = false;
+let mintedBy = {};   // { tokenId(number) : minterAddrLower }
 const _blockTsCache = {};
 
 async function rpcJson(method, params) {
@@ -2145,6 +2155,7 @@ function nftNameById(tokenId) {
 }
 
 async function loadRealActivity() {
+  mintedBy = {};
   try {
     const listedTopic = (window.ethers && ethers.utils)
       ? ethers.utils.id('Listed(uint256,address,uint256)')
@@ -2167,9 +2178,14 @@ async function loadRealActivity() {
       const time = await blockTime(lg.blockNumber);
       const item = nftNameById(tokenId);
       if (fromT === ZERO_TOPIC) {
-        rows.push({ event: 'Mint', item, price: 'Mint', from: shortAddr(to), to: shortAddr(to), time });
+        mintedBy[tokenId] = to.toLowerCase();
+        rows.push({ event: 'Mint', item, price: 'Mint',
+          from: shortAddr(to), to: shortAddr(to),
+          fromFull: to.toLowerCase(), toFull: to.toLowerCase(), time });
       } else if (toT !== ZERO_TOPIC) {
-        rows.push({ event: 'Transfer', item, price: '—', from: shortAddr(from), to: shortAddr(to), time });
+        rows.push({ event: 'Transfer', item, price: '—',
+          from: shortAddr(from), to: shortAddr(to),
+          fromFull: from.toLowerCase(), toFull: to.toLowerCase(), time });
       }
     }
     for (const lg of listed) {
@@ -2181,7 +2197,9 @@ async function loadRealActivity() {
         if (wei.gt(0)) price = parseFloat(ethers.utils.formatEther(wei)).toFixed(3).replace(/\.?0+$/, '');
       } catch (e) {}
       const time = await blockTime(lg.blockNumber);
-      rows.push({ event: 'List', item: nftNameById(tokenId), price, from: shortAddr(seller), to: '—', time });
+      rows.push({ event: 'List', item: nftNameById(tokenId), price,
+        from: shortAddr(seller), to: '—',
+        fromFull: seller.toLowerCase(), toFull: '', time });
     }
     for (const lg of sold) {
       const tokenId = parseInt(lg.topics[1], 16);
@@ -2193,7 +2211,9 @@ async function loadRealActivity() {
         if (wei.gt(0)) price = parseFloat(ethers.utils.formatEther(wei)).toFixed(3).replace(/\.?0+$/, '');
       } catch (e) {}
       const time = await blockTime(lg.blockNumber);
-      rows.push({ event: 'Sale', item: nftNameById(tokenId), price, from: shortAddr(seller), to: shortAddr(buyer), time });
+      rows.push({ event: 'Sale', item: nftNameById(tokenId), price,
+        from: shortAddr(seller), to: shortAddr(buyer),
+        fromFull: seller.toLowerCase(), toFull: buyer.toLowerCase(), time });
     }
     realActivity = rows.sort((a, b) => b.time - a.time);
   } catch (e) {
@@ -2202,6 +2222,8 @@ async function loadRealActivity() {
   }
   activityLoaded = true;
   if (S.currentPage === 'activity') renderActivity();
+  if (S.currentPage === 'profile') renderProfile();
+  updateProfileStats();
 }
 
 function profileAvatarStorageKey() {
@@ -2322,19 +2344,38 @@ function showProfileTab(tab) {
   const myNFTs = profileNFTsForWallet();
   const myListed = myNFTs.filter(n => n.price && n.price !== '—' && parseFloat(n.price) > 0);
   if (tab === 'created') {
-    if (!myNFTs.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🎨</div><h3>No NFTs minted yet</h3><p>Uploading art in Studio is only a preview — you must click <strong>Mint NFT on Lightchain</strong> and approve in Trust Wallet to mint.</p><button class="btn btn-primary" onclick="showPage('studio')">Go to Studio</button></div>`;
-    else { content.innerHTML = '<div class="nft-grid" id="profileNftGrid" style="padding:0"></div>'; renderNFTGrid('profileNftGrid', myNFTs); }
+    const minted = myMintedNFTs();
+    if (!minted.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🎨</div><h3>No NFTs minted yet</h3><p>Uploading art in Studio is only a preview — you must click <strong>Mint NFT on Lightchain</strong> and approve in Trust Wallet to mint.</p><button class="btn btn-primary" onclick="showPage('studio')">Go to Studio</button></div>`;
+    else { content.innerHTML = '<div class="nft-grid" id="profileNftGrid" style="padding:0"></div>'; renderNFTGrid('profileNftGrid', minted); }
   } else if (tab === 'collected') {
-    content.innerHTML = `<div class="empty-state"><div class="big-icon">🛍️</div><h3>No collected NFTs</h3><p>Browse the marketplace and buy your first NFT</p><button class="btn btn-primary" onclick="showPage('discover')">Browse Marketplace</button></div>`;
+    const mine = myCollectedNFTs();
+    if (!activityLoaded) {
+      content.innerHTML = `<div class="empty-state"><div class="big-icon">⏳</div><h3>Loading collected…</h3></div>`;
+    } else if (!mine.length) {
+      content.innerHTML = `<div class="empty-state"><div class="big-icon">🛍️</div><h3>No collected NFTs yet</h3><p>NFTs you buy from other creators show up here.</p><button class="btn btn-primary" onclick="showPage('discover')">Browse Marketplace</button></div>`;
+    } else {
+      content.innerHTML = '<div class="nft-grid" id="profileCollectedGrid" style="padding:0"></div>';
+      renderNFTGrid('profileCollectedGrid', mine);
+    }
   } else if (tab === 'listings') {
     if (!myListed.length) content.innerHTML = `<div class="empty-state"><div class="big-icon">🏷️</div><h3>No active listings</h3><p>List your NFTs for sale from their detail page</p></div>`;
     else { content.innerHTML = '<div class="nft-grid" id="profileListGrid" style="padding:0"></div>'; renderNFTGrid('profileListGrid', myListed); }
   } else if (tab === 'activity') {
-    const activityRows = (realNFTs.length > 0 ? myNFTs : []).map(n =>
-      `<tr><td><span class="event-badge ev-mint">Mint</span></td><td>${n.name}</td><td>Free</td><td class="text-muted">Just now</td></tr>`
-    );
-    const fallback = DEMO_ACTIVITY.slice(0,3).map(a=>`<tr><td><span class="event-badge ${a.event==='Mint'?'ev-mint':'ev-sale'}">${a.event}</span></td><td>${a.item}</td><td>${a.price} LCAI</td><td class="text-muted">${timeAgo(a.time)}</td></tr>`).join('');
-    content.innerHTML = `<div style="overflow-x:auto"><table class="activity-table"><thead><tr><th>Event</th><th>Item</th><th>Price</th><th>Time</th></tr></thead><tbody>${activityRows.length ? activityRows.join('') : fallback}</tbody></table></div>`;
+    const w = (S.wallet || '').toLowerCase();
+    const mine = realActivity.filter(a => a.fromFull === w || a.toFull === w);
+    if (!activityLoaded) {
+      content.innerHTML = `<div class="empty-state"><div class="big-icon">⏳</div><h3>Loading activity…</h3></div>`;
+    } else if (!mine.length) {
+      content.innerHTML = `<div class="empty-state"><div class="big-icon">📭</div><h3>No activity yet</h3><p>Mints, sales, and transfers for this wallet will appear here.</p></div>`;
+    } else {
+      const rows = mine.map(a => `<tr>
+        <td><span class="event-badge ${a.event==='Mint'?'ev-mint':(a.event==='Sale'?'ev-sale':'ev-list')}">${a.event}</span></td>
+        <td>${a.item}</td>
+        <td>${a.price}${/^\d/.test(a.price)?' LCAI':''}</td>
+        <td class="text-muted" title="${absDate(a.time)}">${timeAgo(a.time)}</td>
+      </tr>`).join('');
+      content.innerHTML = `<div style="overflow-x:auto"><table class="activity-table"><thead><tr><th>Event</th><th>Item</th><th>Price</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
   }
   updateProfileStats();
 }
@@ -2424,7 +2465,15 @@ async function buyNFT(id) {
   if (!nft.price || nft.price === '—' || parseFloat(nft.price) <= 0) {
     toast('This NFT is not listed for sale', 'err'); return;
   }
-  await sendTx('buy', [id], nft.price);
+  const receipt = await sendTx('buy', [id], nft.price);
+  if (receipt) {
+    toast('Purchased! This NFT is now yours.', 'ok', 4000);
+    await loadRealNFTs();
+    await loadRealActivity();
+    refreshNFTViews();
+    try { openNftModal(id); } catch (e) {}
+    updateProfileStats();
+  }
 }
 
 function openOfferModal(id) {
