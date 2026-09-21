@@ -1228,6 +1228,11 @@ const ADMIN_WALLETS  = [
   '0x2b6b64cc13dd6d5acabcf3a5dd72b6ee8004de35',
   '0x6518fd26a7ad2fe1ba80de5f279ee59f55c0a9ba', // MetaMask (fees) — contract owner
 ];
+// Display-only: token #1 was minted with a lost Node-worker key. On-chain owner
+// stays 0x1f89…; the site shows MetaMask so the card matches who you are now.
+const DISPLAY_WALLET_OVERRIDE = {
+  '1': '0x6518fd26a7ad2fe1ba80de5f279ee59f55c0a9ba',
+};
 
 // ── MODERATION STATE ──
 let permanentHidden = new Set();   // token IDs permanently removed — loaded from GitHub
@@ -1315,6 +1320,10 @@ const DEMO_ACTIVITY = [
 function shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || '—';
   return addr.slice(0,6) + '…' + addr.slice(-4);
+}
+function displayCreator(n) {
+  if (!n) return '';
+  return DISPLAY_WALLET_OVERRIDE[String(n.id)] || n.creator || '';
 }
 function formatLCAI(wei) {
   if (!wei) return '0';
@@ -2375,7 +2384,7 @@ function openNftModal(id) {
     <div class="nft-detail-name">${nft.name}</div>
     ${mintBanner}
     <div class="nft-detail-origin">${originLabel(nft.origin)}</div>
-    <div class="owner-row"><div class="owner-avatar">${nft.creator.slice(2,4)}</div><span>Owned by</span><strong>${nft.creator}</strong></div>
+    <div class="owner-row"><div class="owner-avatar">${displayCreator(nft).slice(2,4)}</div><span>Owned by</span><strong>${displayCreator(nft)}</strong></div>
     <div class="price-box">
       <div class="lbl">${isListed ? 'Current price' : 'Listing status'}</div>
       <div class="price">${isListed ? nft.price + ' <span>LCAI</span>' : '<span style="font-size:1rem;color:var(--yellow)">Not listed</span>'}</div>
@@ -2389,7 +2398,7 @@ function openNftModal(id) {
     <div class="detail-section">
       <div class="detail-section-title">Details</div>
       <div class="fee-row"><span class="lbl">Token ID</span><span class="val">#${nft.id}</span></div>
-      <div class="fee-row"><span class="lbl">Creator</span><span class="val addr-short">${nft.creator}</span></div>
+      <div class="fee-row"><span class="lbl">Creator</span><span class="val addr-short">${displayCreator(nft)}</span></div>
       <div class="fee-row"><span class="lbl">Royalty</span><span class="val">5%</span></div>
       <div class="fee-row"><span class="lbl">Chain</span><span class="val">Lightchain (9200)</span></div>
     </div>
