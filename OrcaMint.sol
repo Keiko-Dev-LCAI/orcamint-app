@@ -230,7 +230,7 @@ contract OrcaMint {
     /**
      * @notice Mint a single NFT.
      * @param to          Recipient wallet
-     * @param uri         Metadata JSON URI (stored on R2/IPFS)
+     * @param uri         Metadata JSON as an on-chain base64 data URI (image bytes embedded inline; stored fully on-chain in contract state — no R2/IPFS/servers)
      * @param royaltyBps  Creator royalty in basis points (0–2000, i.e. 0–20%)
      * @param collectionId  Collection to attach to (0 = none)
      * @param origin      0=Artist Upload, 1=AIVM Enhanced, 2=AIVM Generated
