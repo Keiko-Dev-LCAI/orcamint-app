@@ -11,4 +11,6 @@ for f in index.html manifest.json sw.js \
   [ -f "$f" ] && cp "$f" public/
 done
 [ -f .well-known/assetlinks.json ] && cp .well-known/assetlinks.json public/.well-known/
+# Get LCAI on-ramp widget (self-hosted ethers + eth-pay + widget)
+[ -d getlcai ] && { mkdir -p public/getlcai && cp getlcai/*.js public/getlcai/; }
 echo "public/ ready for wrangler ($(find public -type f | wc -l) files)"
